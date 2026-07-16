@@ -1,7 +1,8 @@
 package gateway
 
 import (
-	"log"
+	"crypto/subtle"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -28,7 +29,7 @@ func New(cfg config.Config) (http.Handler, error) {
 		},
 
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			log.Printf("gateway: upstream error for %s %s: %v", r.Method, r.URL.Path, err)
+			slog.Error("upstream request failed", "method", r.Method, "path", r.URL.Path, "err", err)
 			http.Error(w, "upstream request failed", http.StatusBadGateway)
 		},
 	}
@@ -38,17 +39,54 @@ func New(cfg config.Config) (http.Handler, error) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-	mux.Handle("/", proxy)
+	mux.Handle("/", withAudit(withAuth(cfg, proxy)))
 
-	return withAccessLog(mux), nil
+	return mux, nil
 }
 
-func withAccessLog(next http.Handler) http.Handler {
+func withAuth(cfg config.Config, next http.Handler) http.Handler {
+	if len(cfg.APIKeys) == 0 {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := bearerToken(r.Header.Get("Authorization"))
+		if token == "" || !validKey(token, cfg.APIKeys) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func bearerToken(header string) string {
+	const prefix = "Bearer "
+	if len(header) > len(prefix) && strings.EqualFold(header[:len(prefix)], prefix) {
+		return header[len(prefix):]
+	}
+	return ""
+}
+
+func validKey(token string, keys []string) bool {
+	var ok bool
+	for _, k := range keys {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(k)) == 1 {
+			ok = true
+		}
+	}
+	return ok
+}
+
+func withAudit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		log.Printf("%s %s -> %d (%s)", r.Method, r.URL.Path, sw.status, time.Since(start).Round(time.Millisecond))
+		slog.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", sw.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
 	})
 }
 
