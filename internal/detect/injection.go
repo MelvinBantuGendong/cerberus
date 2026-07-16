@@ -1,8 +1,11 @@
 package detect
 
+import "github.com/MelvinBantuGendong/cerberus/internal/verdict"
+
 func newInjectionDetector() patternDetector {
 	return patternDetector{
-		category: "prompt_injection",
+		category:  "prompt_injection",
+		direction: verdict.Inbound,
 		rules: []rule{
 			mustRule("ignore_previous", 0.9, `(?i)ignore\s+(all\s+|the\s+|any\s+)*(previous|prior|above|preceding|earlier)\s+(instructions?|prompts?|directions?|messages?|context)`),
 			mustRule("disregard_above", 0.9, `(?i)disregard\s+(all\s+|the\s+|any\s+)*(previous|prior|above|preceding|earlier)`),
