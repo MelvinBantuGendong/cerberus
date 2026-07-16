@@ -3,35 +3,44 @@ package gateway
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/MelvinBantuGendong/cerberus/internal/config"
 	"github.com/MelvinBantuGendong/cerberus/internal/ingest"
+	"github.com/MelvinBantuGendong/cerberus/internal/store"
 	"github.com/MelvinBantuGendong/cerberus/internal/verdict"
 )
 
-func New(cfg config.Config, detectors ...ingest.Detector) (http.Handler, error) {
+type OutboundFactory func(systemPrompt string) []ingest.Detector
+
+func New(cfg config.Config, st *store.Store, inbound []ingest.Detector, outbound OutboundFactory) (http.Handler, error) {
+	hasOutbound := outbound != nil
+
 	proxy := &httputil.ReverseProxy{
 		FlushInterval: -1,
 
 		Rewrite: func(pr *httputil.ProxyRequest) {
+			snap := st.Snapshot()
 			rest := strings.TrimPrefix(pr.In.URL.Path, cfg.IncomingPrefix)
-			pr.Out.URL.Scheme = cfg.UpstreamBase.Scheme
-			pr.Out.URL.Host = cfg.UpstreamBase.Host
-			pr.Out.URL.Path = slashParseFix(cfg.UpstreamBase.Path, rest)
+			pr.Out.URL.Scheme = snap.Upstream.Scheme
+			pr.Out.URL.Host = snap.Upstream.Host
+			pr.Out.URL.Path = slashParseFix(snap.Upstream.Path, rest)
 			pr.Out.URL.RawQuery = pr.In.URL.RawQuery
-			pr.Out.Host = cfg.UpstreamBase.Host
+			pr.Out.Host = snap.Upstream.Host
 
-			if cfg.UpstreamKey != "" {
-				pr.Out.Header.Set("Authorization", "Bearer "+cfg.UpstreamKey)
+			if snap.UpstreamKey != "" {
+				pr.Out.Header.Set("Authorization", "Bearer "+snap.UpstreamKey)
+			}
+			if hasOutbound && snap.OutboundMode != config.OutboundOff {
+				pr.Out.Header.Set("Accept-Encoding", "identity")
 			}
 		},
 
@@ -40,24 +49,31 @@ func New(cfg config.Config, detectors ...ingest.Detector) (http.Handler, error) 
 			http.Error(w, "upstream request failed", http.StatusBadGateway)
 		},
 	}
+	if hasOutbound {
+		proxy.ModifyResponse = modifyResponse(st, outbound)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-	mux.Handle("/", withAudit(withAuth(cfg, withScan(cfg, detectors, proxy))))
+	if cfg.AdminToken != "" {
+		mux.Handle("/admin/", adminHandler(cfg.AdminToken, st))
+	}
+	mux.Handle("/", withAudit(withAuth(st, withScan(st, inbound, hasOutbound, proxy))))
 
 	return mux, nil
 }
 
-func withAuth(cfg config.Config, next http.Handler) http.Handler {
-	if len(cfg.APIKeys) == 0 {
-		return next
-	}
+func withAuth(st *store.Store, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !st.Snapshot().AuthEnabled {
+			next.ServeHTTP(w, r)
+			return
+		}
 		token := bearerToken(r.Header.Get("Authorization"))
-		if token == "" || !validKey(token, cfg.APIKeys) {
+		if token == "" || !st.ValidKey(token) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -73,24 +89,15 @@ func bearerToken(header string) string {
 	return ""
 }
 
-func validKey(token string, keys []string) bool {
-	var ok bool
-	for _, k := range keys {
-		if subtle.ConstantTimeCompare([]byte(token), []byte(k)) == 1 {
-			ok = true
-		}
-	}
-	return ok
-}
-
-func withScan(cfg config.Config, detectors []ingest.Detector, next http.Handler) http.Handler {
+func withScan(st *store.Store, inbound []ingest.Detector, hasOutbound bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body == nil || r.Body == http.NoBody {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		r.Body = http.MaxBytesReader(w, r.Body, cfg.MaxBodyBytes)
+		snap := st.Snapshot()
+		r.Body = http.MaxBytesReader(w, r.Body, snap.MaxBodyBytes)
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			var maxErr *http.MaxBytesError
@@ -104,13 +111,20 @@ func withScan(cfg config.Config, detectors []ingest.Detector, next http.Handler)
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		r.ContentLength = int64(len(body))
 
-		if len(body) > 0 && len(detectors) > 0 {
+		rs := stateFrom(r.Context())
+		if rs != nil && hasOutbound && snap.OutboundMode != config.OutboundOff {
+			rs.systemPrompt = ingest.SystemPrompt(body)
+		}
+
+		if len(body) > 0 && len(inbound) > 0 {
 			segs, perr := ingest.Ingest(body)
 			if perr != nil {
 				slog.Debug("scan skipped: body is not a chat-completions request", "path", r.URL.Path, "err", perr)
 			} else {
-				v := ingest.Dispatch(verdict.Inbound, segs, detectors)
-				recordVerdict(r.Context(), v)
+				v := ingest.Dispatch(verdict.Inbound, segs, inbound)
+				if rs != nil {
+					rs.inbound = &v
+				}
 				if v.Action == verdict.Block {
 					writeBlocked(w, v)
 					return
@@ -121,6 +135,57 @@ func withScan(cfg config.Config, detectors []ingest.Detector, next http.Handler)
 	})
 }
 
+func modifyResponse(st *store.Store, outbound OutboundFactory) func(*http.Response) error {
+	return func(resp *http.Response) error {
+		mode := st.Snapshot().OutboundMode
+		if mode == config.OutboundOff {
+			return nil
+		}
+
+		sp := ""
+		if rs := stateFrom(resp.Request.Context()); rs != nil {
+			sp = rs.systemPrompt
+		}
+		detectors := outbound(sp)
+		record := func(v verdict.Verdict) {
+			if rs := stateFrom(resp.Request.Context()); rs != nil {
+				rs.outbound = &v
+			}
+		}
+		isSSE := strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream")
+
+		if mode == config.OutboundStream && isSSE {
+			resp.Header.Del("Content-Length")
+			resp.Body = newStreamScanner(resp.Body, detectors, record)
+			return nil
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		resp.Body.Close()
+
+		v := ingest.Dispatch(verdict.Outbound, ingest.FromText(extractResponseText(body, isSSE)), detectors)
+		record(v)
+
+		out := body
+		switch v.Action {
+		case verdict.Block:
+			out = buildRefusal(isSSE)
+			resp.StatusCode = http.StatusOK
+			resp.Header.Set("X-Cerberus-Outbound", "block")
+		case verdict.Flag:
+			resp.Header.Set("X-Cerberus-Outbound", "flag")
+		}
+		resp.Body = io.NopCloser(bytes.NewReader(out))
+		resp.ContentLength = int64(len(out))
+		resp.Header.Set("Content-Length", strconv.Itoa(len(out)))
+		resp.TransferEncoding = nil
+		return nil
+	}
+}
+
 func writeBlocked(w http.ResponseWriter, v verdict.Verdict) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
@@ -129,21 +194,24 @@ func writeBlocked(w http.ResponseWriter, v verdict.Verdict) {
 
 type ctxKey int
 
-const verdictKey ctxKey = iota
+const stateKey ctxKey = iota
 
-type verdictSlot struct{ v *verdict.Verdict }
+type reqState struct {
+	inbound      *verdict.Verdict
+	outbound     *verdict.Verdict
+	systemPrompt string
+}
 
-func recordVerdict(ctx context.Context, v verdict.Verdict) {
-	if slot, ok := ctx.Value(verdictKey).(*verdictSlot); ok {
-		slot.v = &v
-	}
+func stateFrom(ctx context.Context) *reqState {
+	rs, _ := ctx.Value(stateKey).(*reqState)
+	return rs
 }
 
 func withAudit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		slot := &verdictSlot{}
-		r = r.WithContext(context.WithValue(r.Context(), verdictKey, slot))
+		rs := &reqState{}
+		r = r.WithContext(context.WithValue(r.Context(), stateKey, rs))
 
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
@@ -154,17 +222,27 @@ func withAudit(next http.Handler) http.Handler {
 			"status", sw.status,
 			"duration_ms", time.Since(start).Milliseconds(),
 		}
-		if slot.v != nil {
-			attrs = append(attrs,
-				"action", slot.v.Action,
-				"score", slot.v.Score,
-				"categories", slot.v.Categories,
-				"matched_rules", slot.v.MatchedRules,
-				"trust_level", slot.v.TrustLevel,
-			)
+		if rs.inbound != nil {
+			attrs = append(attrs, verdictAttrs(rs.inbound)...)
 		}
 		slog.Info("request", attrs...)
+
+		if rs.outbound != nil {
+			resp := []any{"path", r.URL.Path}
+			resp = append(resp, verdictAttrs(rs.outbound)...)
+			slog.Info("response", resp...)
+		}
 	})
+}
+
+func verdictAttrs(v *verdict.Verdict) []any {
+	return []any{
+		"action", v.Action,
+		"score", v.Score,
+		"categories", v.Categories,
+		"matched_rules", v.MatchedRules,
+		"trust_level", v.TrustLevel,
+	}
 }
 
 type statusWriter struct {
