@@ -1,8 +1,11 @@
 package detect
 
+import "github.com/MelvinBantuGendong/cerberus/internal/verdict"
+
 func newJailbreakDetector() patternDetector {
 	return patternDetector{
-		category: "jailbreak",
+		category:  "jailbreak",
+		direction: verdict.Inbound,
 		rules: []rule{
 			mustRule("do_anything_now", 0.85, `(?i)do\s+anything\s+now`),
 			mustRule("dan_mode", 0.8, `(?i)\bDAN\s+mode\b`),

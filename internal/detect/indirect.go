@@ -1,8 +1,11 @@
 package detect
 
+import "github.com/MelvinBantuGendong/cerberus/internal/verdict"
+
 func newIndirectDetector() patternDetector {
 	return patternDetector{
-		category: "indirect_injection",
+		category:  "indirect_injection",
+		direction: verdict.Inbound,
 		rules: []rule{
 			mustRule("addresses_the_ai", 0.7, `(?i)\b(attention|note|important|message|instruction)\b.{0,20}\b(ai|assistant|llm|model|chatbot|language model)\b`),
 			mustRule("when_you_read_this", 0.7, `(?i)\b(when|if|whenever|after)\s+you\s+(read|process|see|encounter|receive|parse)\b`),

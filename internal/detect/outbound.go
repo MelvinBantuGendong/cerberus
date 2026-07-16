@@ -16,7 +16,8 @@ func Outbound(systemPrompt string) []ingest.Detector {
 }
 
 var piiDetector = patternDetector{
-	category: "pii_leak",
+	category:  "pii_leak",
+	direction: verdict.Outbound,
 	rules: []rule{
 		mustRule("ssn", 0.85, `\b\d{3}-\d{2}-\d{4}\b`),
 		mustRule("email", 0.6, `\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b`),
@@ -26,7 +27,8 @@ var piiDetector = patternDetector{
 }
 
 var secretDetector = patternDetector{
-	category: "secret_leak",
+	category:  "secret_leak",
+	direction: verdict.Outbound,
 	rules: []rule{
 		mustRule("private_key", 0.97, `-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----`),
 		mustRule("openai_key", 0.95, `\bsk-[A-Za-z0-9]{20,}\b`),

@@ -15,8 +15,9 @@ type rule struct {
 }
 
 type patternDetector struct {
-	category string
-	rules    []rule
+	category  string
+	direction verdict.Direction
+	rules     []rule
 }
 
 func (d patternDetector) Check(s ingest.Segment) verdict.Verdict {
@@ -31,7 +32,7 @@ func (d patternDetector) Check(s ingest.Segment) verdict.Verdict {
 		}
 	}
 	if len(matched) == 0 {
-		return verdict.Allowing(verdict.Inbound, s.Trust)
+		return verdict.Allowing(d.direction, s.Trust)
 	}
 	sort.Strings(matched)
 	return verdict.Verdict{
@@ -39,7 +40,7 @@ func (d patternDetector) Check(s ingest.Segment) verdict.Verdict {
 		Score:        score,
 		Categories:   []string{d.category},
 		MatchedRules: matched,
-		Direction:    verdict.Inbound,
+		Direction:    d.direction,
 		TrustLevel:   s.Trust,
 	}
 }
