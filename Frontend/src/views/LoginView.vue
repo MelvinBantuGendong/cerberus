@@ -10,6 +10,9 @@ const currentLogIndex = ref(0)
 
 const mouseX = ref(0)
 const mouseY = ref(0)
+const orbX = ref(0)
+const orbY = ref(0)
+const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 // Simulated Logs
 const sampleLogs = [
@@ -23,6 +26,12 @@ const sampleLogs = [
 ]
 
 onMounted(() => {
+  // Initialize positions to center of screen
+  mouseX.value = window.innerWidth / 2
+  mouseY.value = window.innerHeight / 2
+  orbX.value = window.innerWidth / 2
+  orbY.value = window.innerHeight / 2
+
   // Stream terminal logs on login screen for minimal developer aesthetic
   const interval = setInterval(() => {
     if (currentLogIndex.value < sampleLogs.length) {
@@ -32,6 +41,87 @@ onMounted(() => {
       clearInterval(interval)
     }
   }, 500)
+
+  // Initialize high-performance Ripple Canvas Grid
+  const canvas = canvasRef.value
+  if (canvas) {
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      const dpr = window.devicePixelRatio || 1
+      let width = window.innerWidth
+      let height = window.innerHeight
+      
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      ctx.scale(dpr, dpr)
+
+      const handleResize = () => {
+        if (!canvas) return
+        width = window.innerWidth
+        height = window.innerHeight
+        canvas.width = width * dpr
+        canvas.height = height * dpr
+        ctx.scale(dpr, dpr)
+      }
+      window.addEventListener('resize', handleResize)
+
+      const spacing = 24 // Space between dots
+      const maxDist = 220 // Area of ripple influence around light ball
+
+      const updateLoop = () => {
+        // Gravitational lag easing calculation
+        const ease = 0.05
+        orbX.value = orbX.value + (mouseX.value - orbX.value) * ease
+        orbY.value = orbY.value + (mouseY.value - orbY.value) * ease
+
+        ctx.clearRect(0, 0, width, height)
+
+        const startX = (width % spacing) / 2
+        const startY = (height % spacing) / 2
+
+        for (let x0 = startX; x0 < width; x0 += spacing) {
+          for (let y0 = startY; y0 < height; y0 += spacing) {
+            const dx = x0 - orbX.value
+            const dy = y0 - orbY.value
+            const dist = Math.sqrt(dx * dx + dy * dy)
+
+            let x = x0
+            let y = y0
+            let opacity = 0.08
+            let dotSize = 0.7
+
+            if (dist < maxDist) {
+              const force = (maxDist - dist) / maxDist
+
+              // Ripple effect: repel dots outward relative to the distance of floating orb
+              const push = force * 5
+              x = x0 + (dx / (dist || 1)) * push
+              y = y0 + (dy / (dist || 1)) * push
+
+              // Expand and highlight dots near the gravitating core (toned down for subtlety)
+              opacity = 0.08 + force * 0.14
+              dotSize = 0.7 + force * 0.3
+
+              // Blend colors to a very muted, soft crimson tone
+              const r = Math.round(63 + force * 60)
+              const g = Math.round(63 - force * 10)
+              const b = Math.round(70 - force * 15)
+              ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`
+            } else {
+              ctx.fillStyle = `rgba(63, 63, 70, ${opacity})` // standard zinc-700 gray dot
+            }
+
+            ctx.beginPath()
+            ctx.arc(x, y, dotSize, 0, Math.PI * 2)
+            ctx.fill()
+          }
+        }
+
+        requestAnimationFrame(updateLoop)
+      }
+      requestAnimationFrame(updateLoop)
+    }
+  }
 })
 
 const handleGithubLogin = () => {
@@ -50,9 +140,9 @@ const handleGithubLogin = () => {
 }
 
 const handleMouseMove = (e: MouseEvent) => {
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  mouseX.value = e.clientX - rect.left
-  mouseY.value = e.clientY - rect.top
+  // Use clientX / clientY since canvas uses fixed viewport space
+  mouseX.value = e.clientX
+  mouseY.value = e.clientY
 }
 
 const scrollToInfo = () => {
@@ -135,14 +225,13 @@ const isUsingCustom = ref(false)
 
 const activeScenario = computed(() => {
   if (isUsingCustom.value) {
-    // Basic heuristics for custom inputs
     const text = customInput.value.toLowerCase()
     let action: 'allow' | 'block' | 'flag' = 'allow'
     let score = 0.01
     let categories: string[] = []
     let matchedRules: string[] = []
     let direction: 'inbound' | 'outbound' = 'inbound'
-    let trustLevel: 'trusted' | 'semi_trusted' | 'untrusted' | 'default' = 'default'
+    let textTrust: 'trusted' | 'semi_trusted' | 'untrusted' | 'default' = 'default'
     let output = customInput.value
 
     if (text.includes('ignore') || text.includes('jailbreak') || text.includes('instruction')) {
@@ -150,14 +239,14 @@ const activeScenario = computed(() => {
       score = 0.95
       categories = ['prompt_injection']
       matchedRules = ['rule_obfuscation_patterns']
-      trustLevel = 'untrusted'
+      textTrust = 'untrusted'
       output = '[CONNECTION TERMINATED] Jailbreak vector intercepted by Ingress Sentry.'
     } else if (text.includes('rm ') || text.includes('sudo') || text.includes('drop table')) {
       action = 'block'
       score = 0.99
       categories = ['destructive_command']
       matchedRules = ['rule_dangerous_system_call']
-      trustLevel = 'untrusted'
+      textTrust = 'untrusted'
       output = '[EXECUTION BLOCKED] System execution terminated by Runtime Firewall.'
     } else if (text.includes('sk_') || text.includes('key') || text.includes('token')) {
       action = 'flag'
@@ -165,7 +254,7 @@ const activeScenario = computed(() => {
       categories = ['context_leak']
       matchedRules = ['rule_credential_exposure']
       direction = 'outbound'
-      trustLevel = 'semi_trusted'
+      textTrust = 'semi_trusted'
       output = 'Processing stream data... Credentials masked securely: [REDACTED_SECURE]'
     } else {
       output = `Standard pass-through query processed. Response forwarded.`
@@ -175,13 +264,12 @@ const activeScenario = computed(() => {
       name: 'Custom Prompt',
       input: customInput.value,
       output,
-      verdict: { action, score, categories, matchedRules, direction, trustLevel }
+      verdict: { action, score, categories, matchedRules, direction, trustLevel: textTrust }
     }
   }
   return scenarios[selectedScenarioKey.value]
 })
 
-// Reset custom state when clicking preset buttons
 const selectPreset = (key: keyof typeof scenarios) => {
   isUsingCustom.value = false
   selectedScenarioKey.value = key
@@ -194,7 +282,6 @@ watch(customInput, (newVal) => {
   }
 })
 
-// Dynamic flow status classes
 const animationClass = computed(() => {
   const action = activeScenario.value.verdict.action
   if (action === 'block') return 'animate-block'
@@ -208,21 +295,29 @@ const animationClass = computed(() => {
     @mousemove="handleMouseMove"
     class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans relative overflow-y-auto scroll-smooth"
   >
-    <!-- Clean Minimal Dashed Background -->
-    <div class="absolute inset-0 minimal-dashed z-0 opacity-10 pointer-events-none"></div>
+    <!-- High-Performance Canvas Dot Matrix Ripple Background -->
+    <canvas ref="canvasRef" class="fixed inset-0 w-full h-full z-0 pointer-events-none"></canvas>
 
-    <!-- Interactive Cursor Glow overlay -->
+    <!-- Wide Cursor Follower Glow (Instant soft illumination wrapper) -->
     <div 
       class="absolute inset-0 pointer-events-none z-0 transition-opacity duration-300"
       :style="{
-        background: `radial-gradient(300px circle at ${mouseX}px ${mouseY}px, rgba(239, 68, 68, 0.05), transparent 80%)`
+        background: `radial-gradient(600px circle at ${mouseX}px ${mouseY}px, rgba(239, 68, 68, 0.03), transparent 80%)`
+      }"
+    ></div>
+
+    <!-- Gravitating Orb Core (Fluid red lag lighting) -->
+    <div 
+      class="absolute inset-0 pointer-events-none z-0 transition-opacity duration-300"
+      :style="{
+        background: `radial-gradient(180px circle at ${orbX}px ${orbY}px, rgba(239, 68, 68, 0.12), transparent 75%)`
       }"
     ></div>
 
     <!-- Hero Screen Section -->
     <section class="min-h-screen flex flex-col items-center justify-center px-6 relative z-10 text-center space-y-8">
       
-      <div class="space-y-3.5">
+      <div class="space-y-3.5 select-none">
         <h1 class="text-6xl md:text-7xl font-bold tracking-tight text-white leading-none font-push">
           Cerberus
         </h1>
@@ -238,7 +333,7 @@ const animationClass = computed(() => {
       </div>
 
       <!-- Action Button Group -->
-      <div class="flex flex-col sm:flex-row gap-4 items-center justify-center w-full max-w-md mx-auto">
+      <div class="flex flex-col sm:flex-row gap-4 items-center justify-center w-full max-w-md mx-auto relative z-20">
         <!-- Button 1: Auth -->
         <button 
           @click="handleGithubLogin" 
@@ -274,18 +369,16 @@ const animationClass = computed(() => {
       <div class="max-w-5xl mx-auto space-y-12">
         
         <!-- Section Header -->
-        <div class="text-left max-w-2xl space-y-1">
-          <h2 class="text-xl font-bold text-white font-push">Operational Schema</h2>
-          <p class="text-xs text-zinc-550 leading-relaxed">
-            Cerberus operates inline, intercepting and sanitizing transactions before they reach host layers.
+        <div class="text-left max-w-2xl space-y-1.5">
+          <h2 class="text-lg font-bold text-white tracking-tight font-push">How Cerberus Works</h2>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Cerberus is a security guard for your AI applications. It sits between your users and your AI model, scanning requests for safety threats (like prompt injections or data leaks) and blocking or cleaning them automatically.
           </p>
         </div>
 
         <!-- 3. Animated Request Flow Diagram (Visual schematic) -->
-        <div class="cyber-card rounded-lg p-6 border border-zinc-900 bg-zinc-950/10 flex flex-col items-center justify-center space-y-4">
-          <div class="text-[9px] font-bold text-zinc-550 uppercase tracking-widest font-push">Real-Time Proxy Flow Animation</div>
-          
-          <div class="flex items-center justify-between w-full max-w-2xl relative py-6">
+        <div class="cyber-card rounded p-6 border border-zinc-900 bg-zinc-950/10 flex flex-col space-y-4">
+          <div class="flex items-center justify-between w-full max-w-2xl mx-auto relative py-6">
             <!-- Continuous Connection lines -->
             <div class="absolute left-[10%] right-[10%] top-1/2 -translate-y-1/2 h-0.5 bg-zinc-900 z-0"></div>
             
@@ -296,57 +389,61 @@ const animationClass = computed(() => {
             ></div>
 
             <!-- Node 1: Client Ingress -->
-            <div class="z-20 w-24 h-12 rounded border border-zinc-800 bg-zinc-900/90 flex flex-col justify-center items-center shadow-md">
-              <span class="text-[9px] text-zinc-450 uppercase font-bold tracking-wide">Client Ingress</span>
-              <span class="text-[8px] text-zinc-600 mt-0.5">Request Initiated</span>
+            <div class="z-20 w-28 h-10 rounded border border-zinc-900 bg-zinc-950/80 flex flex-col justify-center items-center shadow-md">
+              <span class="text-[9px] text-zinc-400 uppercase font-bold tracking-wider font-push">User Request</span>
             </div>
 
             <!-- Node 2: Cerberus Gateway -->
             <div 
-              class="z-20 w-32 h-14 rounded border flex flex-col justify-center items-center shadow-lg transition-colors duration-300"
+              class="z-20 w-36 h-12 rounded border flex flex-col justify-center items-center shadow-lg transition-colors duration-300"
               :class="[
                 activeScenario.verdict.action === 'block' ? 'border-red-900 bg-red-950/10 shadow-[0_0_15px_rgba(239,68,68,0.08)]' :
                 activeScenario.verdict.action === 'flag' ? 'border-amber-900 bg-amber-950/10 shadow-[0_0_15px_rgba(245,158,11,0.08)]' :
-                'border-zinc-700 bg-zinc-900/90'
+                'border-zinc-800 bg-zinc-950/95'
               ]"
             >
-              <span class="text-[10px] text-white font-bold font-push">Cerberus Core</span>
-              <span class="text-[8px] mt-0.5 font-bold uppercase" :class="{
+              <span class="text-[10px] text-white font-bold font-push">Cerberus Proxy</span>
+              <span class="text-[8px] mt-0.5 font-bold uppercase tracking-wider font-mono" :class="{
                 'text-red-400': activeScenario.verdict.action === 'block',
                 'text-amber-400': activeScenario.verdict.action === 'flag',
                 'text-emerald-400': activeScenario.verdict.action === 'allow'
               }">
-                {{ activeScenario.verdict.action }}
+                [{{ activeScenario.verdict.action }}]
               </span>
             </div>
 
             <!-- Node 3: LLM Engine -->
-            <div class="z-20 w-24 h-12 rounded border border-zinc-800 bg-zinc-900/90 flex flex-col justify-center items-center shadow-md">
-              <span class="text-[9px] text-zinc-450 uppercase font-bold tracking-wide">LLM Endpoint</span>
-              <span class="text-[8px] text-zinc-600 mt-0.5">Completions</span>
+            <div class="z-20 w-28 h-10 rounded border border-zinc-900 bg-zinc-950/80 flex flex-col justify-center items-center shadow-md">
+              <span class="text-[9px] text-zinc-450 uppercase font-bold tracking-wider font-push">Target AI Model</span>
             </div>
           </div>
+        </div>
+
+        <!-- Section Header 2 -->
+        <div class="text-left max-w-2xl space-y-1.5 pt-8">
+          <h2 class="text-lg font-bold text-white tracking-tight font-push">Interactive Sandbox</h2>
+          <p class="text-xs text-zinc-450 leading-relaxed font-sans">
+            Select a scenario below to see how Cerberus handles requests in real-time. If you are a developer, you can inspect the exact structural verdict JSON payload returned by the proxy further down.
+          </p>
         </div>
 
         <!-- 2. Interactive Threat Playground (Interactive Sandbox) -->
         <div class="grid md:grid-cols-12 gap-8 items-start">
           
           <!-- Sandbox Playpen Interactive Panel (Left Column) -->
-          <div class="md:col-span-7 space-y-4 text-left">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 font-push">Threat Intercept Sandbox</h3>
-            
-            <div class="cyber-card rounded-lg p-5 border border-zinc-900 bg-zinc-900/10 space-y-4">
+          <div class="md:col-span-7 space-y-3 text-left">
+            <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 space-y-4">
               <!-- Preset Scenario Buttons -->
               <div class="space-y-1.5">
-                <span class="text-[9px] text-zinc-550 font-bold uppercase tracking-wider">Select Attack Vectors:</span>
+                <span class="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-push">Preset Scenarios:</span>
                 <div class="flex flex-wrap gap-2">
                   <button 
                     v-for="(scene, key) in scenarios" 
                     :key="key"
                     @click="selectPreset(key as string)"
-                    class="px-2.5 py-1 rounded text-[10px] border font-medium cursor-pointer transition-all"
+                    class="px-2.5 py-1.5 rounded text-[10px] border font-medium cursor-pointer transition-all font-push"
                     :class="[
-                      selectedScenarioKey === key && !isUsingCustom ? 'border-zinc-300 bg-zinc-900 text-white' : 'border-zinc-850 text-zinc-500 hover:text-zinc-300'
+                      selectedScenarioKey === key && !isUsingCustom ? 'border-zinc-300 bg-zinc-900 text-white' : 'border-zinc-850 text-zinc-555 hover:text-zinc-300'
                     ]"
                   >
                     {{ scene.name }}
@@ -355,19 +452,19 @@ const animationClass = computed(() => {
               </div>
 
               <!-- Input text box -->
-              <div class="space-y-1">
-                <label class="text-[9px] text-zinc-550 font-bold uppercase tracking-wider">Live Input Prompt:</label>
+              <div class="space-y-1.5">
+                <label class="text-[9px] text-zinc-500 font-bold uppercase tracking-wider font-push">Prompt Sent to AI:</label>
                 <textarea 
                   v-model="customInput" 
-                  placeholder="Type a custom query here (e.g. including keys, administrative bypass keywords like 'ignore', or commands like 'sudo rm')..."
+                  placeholder="Type your prompt here (e.g. 'ignore previous rules' or commands like 'sudo rm')..."
                   rows="2"
                   class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-300 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono placeholder:text-zinc-700"
                 ></textarea>
               </div>
 
               <!-- Output Box -->
-              <div class="space-y-1">
-                <span class="text-[9px] text-zinc-550 font-bold uppercase tracking-wider">Intercepted Stream Result:</span>
+              <div class="space-y-1.5">
+                <span class="text-[9px] text-zinc-550 font-bold uppercase tracking-wider font-push">Filtered Result (Forwarded to Target):</span>
                 <div class="w-full text-xs bg-zinc-950/80 border border-zinc-900 text-zinc-400 p-2.5 rounded font-mono min-h-[48px] select-all">
                   {{ activeScenario.output }}
                 </div>
@@ -376,23 +473,21 @@ const animationClass = computed(() => {
           </div>
 
           <!-- Live Verdict JSON Payload Output (Right Column) -->
-          <div class="md:col-span-5 space-y-4 text-left">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 font-push">Go Verdict Payload</h3>
-            
-            <div class="cyber-card rounded-lg p-5 border border-zinc-900 bg-zinc-900/10 space-y-4 h-full flex flex-col justify-between">
+          <div class="md:col-span-5 space-y-3 text-left">
+            <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 space-y-4 h-full flex flex-col justify-between">
               <!-- Live metrics -->
               <div class="grid grid-cols-2 gap-3 text-[10px]">
                 <div class="border border-zinc-900 rounded p-2 bg-zinc-950/40">
-                  <span class="text-zinc-550 block text-[8px] uppercase tracking-wide">Threat Score</span>
-                  <span class="text-sm font-bold font-push" :class="{
+                  <span class="text-zinc-555 block text-[8px] uppercase tracking-wide font-push">Risk score (0 - 1)</span>
+                  <span class="text-sm font-bold font-push mt-0.5 block" :class="{
                     'text-red-400': activeScenario.verdict.score >= 0.8,
                     'text-amber-400': activeScenario.verdict.score >= 0.4 && activeScenario.verdict.score < 0.8,
                     'text-emerald-400': activeScenario.verdict.score < 0.4
                   }">{{ activeScenario.verdict.score.toFixed(2) }}</span>
                 </div>
                 <div class="border border-zinc-900 rounded p-2 bg-zinc-950/40">
-                  <span class="text-zinc-550 block text-[8px] uppercase tracking-wide">Client Trust</span>
-                  <span class="text-sm font-bold text-zinc-300 font-push capitalize">{{ activeScenario.verdict.trustLevel }}</span>
+                  <span class="text-zinc-555 block text-[8px] uppercase tracking-wide font-push">Verdict Action</span>
+                  <span class="text-sm font-bold text-zinc-300 font-push capitalize mt-0.5 block">{{ activeScenario.verdict.action }}</span>
                 </div>
               </div>
 
@@ -405,13 +500,20 @@ const animationClass = computed(() => {
 
         </div>
 
+        <!-- Section Header 3 -->
+        <div class="text-left max-w-2xl space-y-1.5 pt-8 border-t border-zinc-900">
+          <h2 class="text-lg font-bold text-white tracking-tight font-push">Technical Subsystems</h2>
+          <p class="text-xs text-zinc-550 leading-relaxed font-sans">
+            Under the hood, Cerberus compiles lightweight security rules into WebAssembly filters. These are executed across three dedicated security layers:
+          </p>
+        </div>
+
         <!-- Section Footer Grid -->
-        <div class="grid md:grid-cols-12 gap-8 items-start pt-6 border-t border-zinc-900">
+        <div class="grid md:grid-cols-12 gap-8 items-start">
           
           <!-- Terminal logs (left column) -->
-          <div class="md:col-span-6 space-y-4">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 text-left font-push">System Boot Logs</h3>
-            <div class="cyber-card rounded-md p-4 font-mono text-[11px] text-zinc-550 border border-zinc-900 bg-zinc-900/10 h-52 overflow-y-auto text-left">
+          <div class="md:col-span-5 space-y-3">
+            <div class="cyber-card rounded p-4 font-mono text-[11px] text-zinc-550 border border-zinc-900 bg-zinc-900/10 h-56 overflow-y-auto text-left">
               <div class="flex items-center justify-between border-b border-zinc-900 pb-2 mb-2">
                 <span class="flex items-center gap-1.5 font-bold uppercase text-[9px] tracking-wider text-zinc-500 font-push">
                   <Terminal class="w-3 h-3 text-zinc-650" />
@@ -437,37 +539,44 @@ const animationClass = computed(() => {
           </div>
 
           <!-- Feature items list: The Three Heads of Cerberus (right column) -->
-          <div class="md:col-span-6 space-y-4 text-left">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 font-push">Active Guardrail Nodes (The Three Heads)</h3>
-            
+          <div class="md:col-span-7 space-y-3 text-left">
             <div class="grid gap-3 font-sans">
-              <div class="cyber-card rounded p-3 border border-zinc-900 bg-zinc-950/20 hover:border-zinc-800 transition-colors">
-                <h4 class="text-xs font-bold text-zinc-300 font-push flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                  Ingress Sentry (Left Head)
-                </h4>
-                <p class="text-[10px] text-zinc-500 mt-1 leading-relaxed">
-                  Stops input threats and prompt injection bypass vectors before LLM analysis begins.
+              <!-- Node 1 -->
+              <div class="cyber-card rounded p-4 border border-zinc-900 bg-zinc-950/20 hover:border-zinc-800 transition-colors space-y-1">
+                <div class="flex items-center justify-between font-push">
+                  <span class="text-[10px] font-bold text-zinc-300 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    Ingress Sentry (Left Head)
+                  </span>
+                </div>
+                <p class="text-[10px] text-zinc-500 leading-relaxed">
+                  Scans incoming user prompts for jailbreaks and injection attacks. It uses vector embeddings to compare user input against known threat patterns before forwarding.
                 </p>
               </div>
 
-              <div class="cyber-card rounded p-3 border border-zinc-900 bg-zinc-950/20 hover:border-zinc-800 transition-colors">
-                <h4 class="text-xs font-bold text-zinc-300 font-push flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                  Runtime Firewall (Middle Head)
-                </h4>
-                <p class="text-[10px] text-zinc-500 mt-1 leading-relaxed">
-                  Inspects code execution and tool call arguments to restrict dangerous system operations.
+              <!-- Node 2 -->
+              <div class="cyber-card rounded p-4 border border-zinc-900 bg-zinc-950/20 hover:border-zinc-800 transition-colors space-y-1">
+                <div class="flex items-center justify-between font-push">
+                  <span class="text-[10px] font-bold text-zinc-300 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    Runtime Firewall (Middle Head)
+                  </span>
+                </div>
+                <p class="text-[10px] text-zinc-500 leading-relaxed">
+                  Monitors tool executions and system calls. If an AI agent attempts to run a hazardous command (like file system deletions or database drops), the firewall intercepts and halts the execution.
                 </p>
               </div>
 
-              <div class="cyber-card rounded p-3 border border-zinc-900 bg-zinc-950/20 hover:border-zinc-800 transition-colors">
-                <h4 class="text-xs font-bold text-zinc-300 font-push flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                  Egress Censor (Right Head)
-                </h4>
-                <p class="text-[10px] text-zinc-500 mt-1 leading-relaxed">
-                  Redacts credentials and PII variables from outgoing completions, enforcing TPM budget governors.
+              <!-- Node 3 -->
+              <div class="cyber-card rounded p-4 border border-zinc-900 bg-zinc-950/20 hover:border-zinc-800 transition-colors space-y-1">
+                <div class="flex items-center justify-between font-push">
+                  <span class="text-[10px] font-bold text-zinc-300 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    Egress Censor (Right Head)
+                  </span>
+                </div>
+                <p class="text-[10px] text-zinc-500 leading-relaxed">
+                  Audits outgoing AI responses. It sanitizes completions by masking sensitive details (like credentials, emails, or credit cards) and halts responses that exceed token/cost limits.
                 </p>
               </div>
             </div>
