@@ -1,7 +1,12 @@
 package gateway
 
 import (
+	"bytes"
+	"context"
 	"crypto/subtle"
+	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
@@ -9,9 +14,11 @@ import (
 	"time"
 
 	"github.com/MelvinBantuGendong/cerberus/internal/config"
+	"github.com/MelvinBantuGendong/cerberus/internal/ingest"
+	"github.com/MelvinBantuGendong/cerberus/internal/verdict"
 )
 
-func New(cfg config.Config) (http.Handler, error) {
+func New(cfg config.Config, detectors ...ingest.Detector) (http.Handler, error) {
 	proxy := &httputil.ReverseProxy{
 		FlushInterval: -1,
 
@@ -39,7 +46,7 @@ func New(cfg config.Config) (http.Handler, error) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-	mux.Handle("/", withAudit(withAuth(cfg, proxy)))
+	mux.Handle("/", withAudit(withAuth(cfg, withScan(cfg, detectors, proxy))))
 
 	return mux, nil
 }
@@ -76,17 +83,87 @@ func validKey(token string, keys []string) bool {
 	return ok
 }
 
+func withScan(cfg config.Config, detectors []ingest.Detector, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body == nil || r.Body == http.NoBody {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, cfg.MaxBodyBytes)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, "cannot read request body", http.StatusBadRequest)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.ContentLength = int64(len(body))
+
+		if len(body) > 0 && len(detectors) > 0 {
+			segs, perr := ingest.Ingest(body)
+			if perr != nil {
+				slog.Debug("scan skipped: body is not a chat-completions request", "path", r.URL.Path, "err", perr)
+			} else {
+				v := ingest.Dispatch(verdict.Inbound, segs, detectors)
+				recordVerdict(r.Context(), v)
+				if v.Action == verdict.Block {
+					writeBlocked(w, v)
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func writeBlocked(w http.ResponseWriter, v verdict.Verdict) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+type ctxKey int
+
+const verdictKey ctxKey = iota
+
+type verdictSlot struct{ v *verdict.Verdict }
+
+func recordVerdict(ctx context.Context, v verdict.Verdict) {
+	if slot, ok := ctx.Value(verdictKey).(*verdictSlot); ok {
+		slot.v = &v
+	}
+}
+
 func withAudit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		slot := &verdictSlot{}
+		r = r.WithContext(context.WithValue(r.Context(), verdictKey, slot))
+
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		slog.Info("request",
+
+		attrs := []any{
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", sw.status,
 			"duration_ms", time.Since(start).Milliseconds(),
-		)
+		}
+		if slot.v != nil {
+			attrs = append(attrs,
+				"action", slot.v.Action,
+				"score", slot.v.Score,
+				"categories", slot.v.Categories,
+				"matched_rules", slot.v.MatchedRules,
+				"trust_level", slot.v.TrustLevel,
+			)
+		}
+		slog.Info("request", attrs...)
 	})
 }
 
