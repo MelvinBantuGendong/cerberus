@@ -1,3 +1,4 @@
+// Package config loads gateway configuration from the environment.
 package config
 
 import (
@@ -5,13 +6,15 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 )
 
 type Config struct {
-	ListenAddr   string
-	UpstreamBase *url.URL
+	ListenAddr     string
+	UpstreamBase   *url.URL
 	IncomingPrefix string
 	UpstreamKey string
+	APIKeys []string
 }
 
 func Load() (Config, error) {
@@ -29,7 +32,18 @@ func Load() (Config, error) {
 		UpstreamBase:   u,
 		IncomingPrefix: getenv("CERBERUS_INCOMING_PREFIX", "/v1"),
 		UpstreamKey:    cmp.Or(os.Getenv("CERBERUS_UPSTREAM_KEY"), os.Getenv("OPENROUTER_API_KEY")),
+		APIKeys:        splitKeys(os.Getenv("CERBERUS_API_KEYS")),
 	}, nil
+}
+
+func splitKeys(raw string) []string {
+	var keys []string
+	for _, k := range strings.Split(raw, ",") {
+		if k = strings.TrimSpace(k); k != "" {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }
 
 func getenv(key, fallback string) string {
