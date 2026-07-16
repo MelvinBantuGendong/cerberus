@@ -1,4 +1,3 @@
-// Package config loads gateway configuration from the environment.
 package config
 
 import (
