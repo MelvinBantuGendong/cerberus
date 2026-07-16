@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Terminal } from '@lucide/vue'
 
@@ -175,7 +175,18 @@ onMounted(() => {
       requestAnimationFrame(updateLoop)
     }
   }
+  
+  window.addEventListener('scroll', handleScroll)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
+
+const showStickyHeader = ref(false)
+const handleScroll = () => {
+  showStickyHeader.value = window.scrollY > 400
+}
 
 const handleCanvasClick = (e: MouseEvent) => {
   // Push a new expanding ripple into grid workspace
@@ -374,6 +385,41 @@ const animationClass = computed(() => {
     @click="handleCanvasClick"
     class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans relative overflow-y-auto scroll-smooth"
   >
+    <!-- Sticky Top Navigation Header (Appears on Scroll) -->
+    <header 
+      class="fixed top-0 left-0 w-full h-14 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md z-40 transition-all duration-300 flex items-center justify-between px-8"
+      :class="[showStickyHeader ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0']"
+    >
+      <!-- Left Side: Brand Logo & Title -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-6 h-6 rounded bg-zinc-900 border border-zinc-850 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 fill-current text-zinc-350" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7v6c0 5.52 4.48 10 10 10s10-4.48 10-10V7l-10-5z" />
+          </svg>
+        </div>
+        <span class="font-bold tracking-wider text-xs text-white font-push">Cerberus</span>
+      </div>
+
+      <!-- Right Side: Continue with GitHub CTA -->
+      <button 
+        @click="handleGithubLogin" 
+        :disabled="isLoading"
+        class="flex items-center justify-center gap-2 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-[10px] py-1.5 px-4 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border border-zinc-200 font-push"
+      >
+        <svg v-if="!isLoading" class="w-3 h-3 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+        </svg>
+        <span v-if="!isLoading">Connect GitHub</span>
+        <span v-else class="flex items-center gap-1.5">
+          <svg class="animate-spin h-3 w-3 text-zinc-950" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Syncing...
+        </span>
+      </button>
+    </header>
+
     <!-- High-Performance Canvas Dot Matrix Ripple Background -->
     <canvas ref="canvasRef" class="fixed inset-0 w-full h-full z-0 pointer-events-none"></canvas>
 
