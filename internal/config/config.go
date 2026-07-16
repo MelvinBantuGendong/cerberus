@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -12,8 +13,9 @@ type Config struct {
 	ListenAddr     string
 	UpstreamBase   *url.URL
 	IncomingPrefix string
-	UpstreamKey string
-	APIKeys []string
+	UpstreamKey    string
+	APIKeys        []string
+	MaxBodyBytes int64
 }
 
 func Load() (Config, error) {
@@ -32,7 +34,15 @@ func Load() (Config, error) {
 		IncomingPrefix: getenv("CERBERUS_INCOMING_PREFIX", "/v1"),
 		UpstreamKey:    cmp.Or(os.Getenv("CERBERUS_UPSTREAM_KEY"), os.Getenv("OPENROUTER_API_KEY")),
 		APIKeys:        splitKeys(os.Getenv("CERBERUS_API_KEYS")),
+		MaxBodyBytes:   parseSize(os.Getenv("CERBERUS_MAX_BODY_BYTES"), 4<<20),
 	}, nil
+}
+
+func parseSize(raw string, fallback int64) int64 {
+	if n, err := strconv.ParseInt(raw, 10, 64); err == nil && n > 0 {
+		return n
+	}
+	return fallback
 }
 
 func splitKeys(raw string) []string {

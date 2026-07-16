@@ -44,6 +44,7 @@ func main() {
 		"incoming_prefix", cfg.IncomingPrefix,
 		"upstream_key", keyState,
 		"auth", authState,
+		"max_body_bytes", cfg.MaxBodyBytes,
 	)
 
 	srv := &http.Server{Addr: cfg.ListenAddr, Handler: handler}
