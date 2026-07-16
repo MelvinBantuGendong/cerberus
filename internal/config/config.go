@@ -9,13 +9,26 @@ import (
 	"strings"
 )
 
+type OutboundMode string
+
+const (
+	OutboundOff    OutboundMode = "off"
+	OutboundBuffer OutboundMode = "buffer"
+	OutboundStream OutboundMode = "stream"
+)
+
 type Config struct {
 	ListenAddr     string
 	UpstreamBase   *url.URL
 	IncomingPrefix string
 	UpstreamKey    string
 	APIKeys        []string
-	MaxBodyBytes int64
+	MaxBodyBytes   int64
+	OutboundMode   OutboundMode
+
+	AdminToken string
+
+	StatePath string
 }
 
 func Load() (Config, error) {
@@ -28,6 +41,11 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("CERBERUS_UPSTREAM %q must be an absolute URL (scheme + host)", rawUpstream)
 	}
 
+	mode, err := parseOutboundMode(os.Getenv("CERBERUS_OUTBOUND_MODE"))
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		ListenAddr:     getenv("CERBERUS_LISTEN", ":8080"),
 		UpstreamBase:   u,
@@ -35,7 +53,21 @@ func Load() (Config, error) {
 		UpstreamKey:    cmp.Or(os.Getenv("CERBERUS_UPSTREAM_KEY"), os.Getenv("OPENROUTER_API_KEY")),
 		APIKeys:        splitKeys(os.Getenv("CERBERUS_API_KEYS")),
 		MaxBodyBytes:   parseSize(os.Getenv("CERBERUS_MAX_BODY_BYTES"), 4<<20),
+		OutboundMode:   mode,
+		AdminToken:     os.Getenv("CERBERUS_ADMIN_TOKEN"),
+		StatePath:      os.Getenv("CERBERUS_STATE_PATH"),
 	}, nil
+}
+
+func parseOutboundMode(raw string) (OutboundMode, error) {
+	switch OutboundMode(raw) {
+	case "":
+		return OutboundBuffer, nil
+	case OutboundOff, OutboundBuffer, OutboundStream:
+		return OutboundMode(raw), nil
+	default:
+		return "", fmt.Errorf("CERBERUS_OUTBOUND_MODE %q must be one of: off, buffer, stream", raw)
+	}
 }
 
 func parseSize(raw string, fallback int64) int64 {

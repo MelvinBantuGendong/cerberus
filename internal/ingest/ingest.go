@@ -32,6 +32,12 @@ type message struct {
 	Name       string          `json:"name"`
 	ToolCalls  []toolCall      `json:"tool_calls"`
 	ToolCallID string          `json:"tool_call_id"`
+
+	Cerberus *cerberusMeta `json:"cerberus"`
+}
+
+type cerberusMeta struct {
+	Trust string `json:"trust"`
 }
 
 type toolCall struct {
@@ -60,6 +66,36 @@ func Ingest(body []byte) ([]Segment, error) {
 	return out, nil
 }
 
+func FromText(text string) []Segment {
+	return Segments(text, verdict.Default)
+}
+
+func Segments(text string, trust verdict.TrustLevel) []Segment {
+	var out []Segment
+	expand(Segment{Text: text, Role: "assistant", Trust: trust}, &out)
+	return out
+}
+
+func SystemPrompt(body []byte) string {
+	req, err := Parse(body)
+	if err != nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, m := range req.Messages {
+		if m.Role != "system" {
+			continue
+		}
+		for _, t := range contentTexts(m.Content) {
+			if b.Len() > 0 {
+				b.WriteByte(' ')
+			}
+			b.WriteString(t)
+		}
+	}
+	return b.String()
+}
+
 func Parse(body []byte) (*request, error) {
 	var req request
 	if err := json.Unmarshal(body, &req); err != nil {
@@ -81,7 +117,7 @@ func Extract(req *request) []Segment {
 
 	var segs []Segment
 	for i, m := range req.Messages {
-		trust := classify(m.Role, i == lastUser)
+		trust := messageTrust(m, i == lastUser)
 		base := fmt.Sprintf("messages[%d]", i)
 
 		texts := contentTexts(m.Content)
@@ -128,6 +164,15 @@ func contentTexts(raw json.RawMessage) []string {
 	return nil
 }
 
+func messageTrust(m message, isLastUser bool) verdict.TrustLevel {
+	if m.Cerberus != nil {
+		if t, ok := ParseTrust(m.Cerberus.Trust); ok {
+			return t
+		}
+	}
+	return classify(m.Role, isLastUser)
+}
+
 func classify(role string, isLastUser bool) verdict.TrustLevel {
 	switch role {
 	case "system":
@@ -140,6 +185,14 @@ func classify(role string, isLastUser bool) verdict.TrustLevel {
 		}
 	}
 	return verdict.Default
+}
+
+func ParseTrust(s string) (verdict.TrustLevel, bool) {
+	switch verdict.TrustLevel(s) {
+	case verdict.Trusted, verdict.SemiTrusted, verdict.Untrusted, verdict.Default:
+		return verdict.TrustLevel(s), true
+	}
+	return "", false
 }
 
 func expand(s Segment, out *[]Segment) {
