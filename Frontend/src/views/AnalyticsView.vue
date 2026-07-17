@@ -1,38 +1,36 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { 
-  Shield, 
-  Terminal, 
-  Cpu, 
-  User, 
-  LogOut, 
-  Sliders, 
-  TrendingUp, 
-  ShieldAlert, 
-  Activity, 
+import {
+  Shield,
+  Terminal,
+  Cpu,
+  User,
+  LogOut,
+  Sliders,
+  TrendingUp,
+  ShieldAlert,
+  Activity,
   Zap,
   Trash2,
   EyeOff,
   Flame,
-  DollarSign
+  DollarSign,
+  Bug
 } from '@lucide/vue'
 
 const router = useRouter()
 
-// Authentication Logout
 const handleLogout = () => {
   localStorage.removeItem('cerberus_auth')
   router.push({ name: 'login' })
 }
 
-// Live Metrics States
 const totalRequests = ref(0)
 const intrusionsBlocked = ref(0)
-const averageLatency = ref(0.0) // in ms overhead
-const apiBudgetSaved = ref(0.00) // API cost savings in USD
+const averageLatency = ref(0.0)
+const apiBudgetSaved = ref(0.00)
 
-// Grafana Classification counters
 const injectionCount = ref(0)
 const commandCount = ref(0)
 const leakCount = ref(0)
@@ -45,25 +43,21 @@ interface BadActor {
 }
 const badActors = ref<BadActor[]>([])
 
-// Real-time scrolling threat trend line (24 intervals of 0s)
 const threatTrend = ref<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
-
-
-// Security Event Log Definition based on Go Backend Verdict Model
 interface SecurityEvent {
   id: string
   timestamp: string
   endpoint: string
   clientIp: string
   method: string
-  action: 'allow' | 'block' | 'flag'       // maps to Verdict.Action
-  score: number                            // maps to Verdict.Score
-  categories: string[]                     // maps to Verdict.Categories
-  matchedRules: string[]                   // maps to Verdict.MatchedRules
-  direction: 'inbound' | 'outbound'        // maps to Verdict.Direction
-  trustLevel: 'trusted' | 'semi_trusted' | 'untrusted' | 'default' // maps to Verdict.TrustLevel
-  latency: number                          // ms
+  action: 'allow' | 'block' | 'flag'
+  score: number
+  categories: string[]
+  matchedRules: string[]
+  direction: 'inbound' | 'outbound'
+  trustLevel: 'trusted' | 'semi_trusted' | 'untrusted' | 'default'
+  latency: number
   inputString: string
   outputString?: string
   isFlash?: boolean
@@ -71,13 +65,10 @@ interface SecurityEvent {
 
 const events = ref<SecurityEvent[]>([])
 
-
-
 const clearLogs = () => {
   events.value = []
 }
 
-// SVG Area Chart Calculations
 const svgWidth = 460
 const svgHeight = 120
 const hoveredPoint = ref<any>(null)
@@ -88,11 +79,11 @@ const chartPoints = computed(() => {
   return threatTrend.value.map((val, idx) => {
     const x = (idx / (threatTrend.value.length - 1)) * svgWidth
     const y = svgHeight - (val / maxVal) * (svgHeight - 20) - 10
-    
+
     const secondsAgo = (threatTrend.value.length - 1 - idx) * 5
     let timeLabel = `${secondsAgo}s ago`
     if (secondsAgo === 0) timeLabel = 'Now'
-    
+
     return {
       x,
       y,
@@ -115,7 +106,6 @@ const areaPath = computed(() => {
   return `M 0,${svgHeight} L ${points.join(' L ')} L ${svgWidth},${svgHeight} Z`
 })
 
-// Payload Diff Explorer Selected State
 const selectedEvent = ref<SecurityEvent | null>(null)
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -147,16 +137,24 @@ onUnmounted(() => {
 
         <!-- Navigation Links -->
         <nav class="p-4 space-y-1">
-          <router-link 
-            :to="{ name: 'builder' }" 
+          <router-link
+            :to="{ name: 'builder' }"
             class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
           >
             <Sliders class="w-3.5 h-3.5" />
             Manage Proxy
           </router-link>
-          
-          <router-link 
-            :to="{ name: 'analytics' }" 
+
+          <router-link
+            :to="{ name: 'testzone' }"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
+          >
+            <Bug class="w-3.5 h-3.5" />
+            Test Zone
+          </router-link>
+
+          <router-link
+            :to="{ name: 'analytics' }"
             class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold bg-zinc-900 text-white border border-zinc-800"
           >
             <Cpu class="w-3.5 h-3.5" />
@@ -176,8 +174,8 @@ onUnmounted(() => {
             <p class="text-xs font-semibold text-zinc-300">dev_mode</p>
 
           </div>
-          <button 
-            @click="handleLogout" 
+          <button
+            @click="handleLogout"
             class="ml-auto text-zinc-500 hover:text-white transition-colors p-1.5 rounded hover:bg-zinc-900 cursor-pointer"
             title="Log Out"
           >
@@ -189,7 +187,7 @@ onUnmounted(() => {
 
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col z-10 min-w-0 overflow-y-auto relative">
-      
+
       <!-- Top Header Bar -->
       <header class="h-16 border-b border-zinc-900 bg-zinc-950/20 backdrop-blur-md flex items-center justify-between px-8 shrink-0">
         <div>
@@ -202,9 +200,8 @@ onUnmounted(() => {
         <!-- Simulation Controllers -->
         <div class="flex items-center gap-2">
 
-
-          <button 
-            @click="clearLogs" 
+          <button
+            @click="clearLogs"
             class="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1.5 rounded border border-zinc-800 bg-zinc-900/50 text-zinc-450 hover:text-white transition-all cursor-pointer font-push"
           >
             <Trash2 class="w-3 h-3" />
@@ -215,10 +212,10 @@ onUnmounted(() => {
 
       <!-- Dashboard Telemetry Cards -->
       <div class="p-8 space-y-6">
-        
+
         <!-- Value Realization Counters -->
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
-          
+
           <!-- Card 1: Total Requests -->
           <div class="cyber-card rounded p-4 border border-zinc-900 bg-zinc-900/5 flex items-center justify-between">
             <div class="space-y-1">
@@ -286,7 +283,7 @@ onUnmounted(() => {
 
         <!-- Grafana Visual Charts Grid -->
         <div class="grid lg:grid-cols-12 gap-6 text-left">
-          
+
           <!-- Panel 1: Threat Mitigation Timeline Area Chart (7 Columns) -->
           <div class="lg:col-span-7 cyber-card rounded border border-zinc-900 bg-zinc-900/10 p-5 flex flex-col space-y-4">
             <div class="flex items-center justify-between border-b border-zinc-900 pb-2.5">
@@ -315,9 +312,9 @@ onUnmounted(() => {
                 <path :d="areaPath" fill="url(#areaGradient)" />
                 <!-- Polyline path -->
                 <path :d="linePath" stroke="#ef4444" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-                
+
                 <!-- Glowing indicator for hovered point -->
-                <circle 
+                <circle
                   v-if="hoveredPoint"
                   :cx="hoveredPoint.x"
                   :cy="hoveredPoint.y"
@@ -326,7 +323,7 @@ onUnmounted(() => {
                 />
 
                 <!-- Faint small dots for all points so they stand out like a real chart -->
-                <circle 
+                <circle
                   v-for="p in chartPoints"
                   :key="'dot-' + p.idx"
                   :cx="p.x"
@@ -336,7 +333,7 @@ onUnmounted(() => {
                 />
 
                 <!-- Invisible helper circles for easy mouse hovering -->
-                <circle 
+                <circle
                   v-for="p in chartPoints"
                   :key="'hover-' + p.idx"
                   :cx="p.x"
@@ -440,7 +437,7 @@ onUnmounted(() => {
 
         <!-- Bad actors IP list panel and transaction logs -->
         <div class="grid lg:grid-cols-12 gap-6 items-start text-left">
-          
+
           <!-- Bad Actors List (4 Columns) -->
           <div class="lg:col-span-4 cyber-card rounded border border-zinc-900 bg-zinc-900/10 p-5 space-y-4">
             <div class="flex items-center justify-between border-b border-zinc-900 pb-2.5">
@@ -449,8 +446,8 @@ onUnmounted(() => {
             </div>
 
             <div class="space-y-3">
-              <div 
-                v-for="actor in badActors" 
+              <div
+                v-for="actor in badActors"
                 :key="actor.ip"
                 class="flex items-center justify-between border-b border-zinc-900/50 pb-2 text-[10px] font-mono"
               >
@@ -474,44 +471,44 @@ onUnmounted(() => {
 
             <!-- Modern Log Stream Feed List (No horizontal overflow) -->
             <div class="cyber-card rounded border border-zinc-900 bg-zinc-900/10 divide-y divide-zinc-900 overflow-hidden">
-              <div 
-                v-for="evt in events" 
-                :key="evt.id" 
+              <div
+                v-for="evt in events"
+                :key="evt.id"
                 @click="selectedEvent = evt"
                 class="group flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-zinc-950/20 hover:bg-zinc-900/30 transition-all cursor-pointer select-none gap-3"
                 :class="[
                   evt.isFlash && evt.action === 'block' ? 'animate-threat-flash-red' :
                   evt.isFlash && evt.action === 'flag' ? 'animate-threat-flash-amber' :
                   evt.isFlash ? 'animate-threat-flash-zinc' : '',
-                  evt.action === 'block' ? 'border-l-2 border-l-red-500' : 
-                  evt.action === 'flag' ? 'border-l-2 border-l-amber-500' : 
+                  evt.action === 'block' ? 'border-l-2 border-l-red-500' :
+                  evt.action === 'flag' ? 'border-l-2 border-l-amber-500' :
                   'border-l-2 border-l-zinc-700'
                 ]"
               >
                 <!-- 1. Verdict & Risk Score -->
                 <div class="flex items-center gap-2.5 shrink-0 sm:w-36">
-                  <span 
-                    v-if="evt.action === 'block'" 
+                  <span
+                    v-if="evt.action === 'block'"
                     class="px-2 py-0.5 rounded border border-red-955 bg-red-950/20 text-red-400 font-semibold text-[9px] inline-flex items-center gap-1 font-mono uppercase"
                   >
                     <ShieldAlert class="w-2.5 h-2.5 shrink-0" />
                     BLOCKED
                   </span>
-                  <span 
-                    v-else-if="evt.action === 'flag'" 
+                  <span
+                    v-else-if="evt.action === 'flag'"
                     class="px-2 py-0.5 rounded border border-amber-955 bg-amber-950/20 text-amber-450 font-semibold text-[9px] inline-flex items-center gap-1 font-mono uppercase"
                   >
                     <EyeOff class="w-2.5 h-2.5 shrink-0" />
                     FLAGGED
                   </span>
-                  <span 
-                    v-else 
+                  <span
+                    v-else
                     class="px-2 py-0.5 rounded border border-zinc-900 bg-zinc-950 text-zinc-500 text-[9px] inline-flex items-center gap-1 font-mono uppercase"
                   >
                     <Shield class="w-2.5 h-2.5 text-zinc-650 shrink-0" />
                     ALLOWED
                   </span>
-                  
+
                   <span class="text-[10px] font-mono" :class="{
                     'text-red-400 font-bold': evt.score >= 0.8,
                     'text-amber-400': evt.score >= 0.4 && evt.score < 0.8,
@@ -555,16 +552,16 @@ onUnmounted(() => {
                 <div class="flex flex-wrap gap-1 items-center text-left sm:w-44 shrink-0 font-mono">
                   <span v-if="evt.categories.length === 0" class="text-zinc-600 text-[10px] font-mono">-</span>
                   <template v-else>
-                    <span 
-                      v-for="cat in evt.categories" 
-                      :key="cat" 
+                    <span
+                      v-for="cat in evt.categories"
+                      :key="cat"
                       class="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-350 text-[8px] border border-zinc-850"
                     >
                       {{ cat }}
                     </span>
-                    <span 
-                      v-for="rule in evt.matchedRules" 
-                      :key="rule" 
+                    <span
+                      v-for="rule in evt.matchedRules"
+                      :key="rule"
                       class="text-[8px] text-zinc-600 max-w-[90px] truncate"
                       :title="rule"
                     >
@@ -599,32 +596,32 @@ onUnmounted(() => {
       </div>
 
       <!-- Payload Diff Explorer side-by-side modal -->
-      <div 
-        v-if="selectedEvent" 
+      <div
+        v-if="selectedEvent"
         class="fixed inset-0 z-50 flex items-center justify-center p-6 bg-zinc-950/80 backdrop-blur-sm"
         @click.self="selectedEvent = null"
       >
         <div class="cyber-card rounded-lg border border-zinc-800 bg-zinc-950 max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden text-left relative z-50">
-          
+
           <!-- Modal Header -->
           <div class="p-4 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/30">
             <div class="space-y-0.5">
               <span class="text-[9px] text-zinc-500 font-mono tracking-wider font-semibold">TRANSACTION ID: {{ selectedEvent.id }}</span>
               <h3 class="text-xs font-bold text-white font-push flex items-center gap-2">
                 Payload Diff Explorer
-                <span 
+                <span
                   v-if="selectedEvent.action === 'block'"
                   class="px-2 py-0.5 rounded bg-red-950/30 text-red-400 border border-red-900/20 text-[9px] font-mono font-bold"
                 >
                   BLOCKED
                 </span>
-                <span 
+                <span
                   v-else-if="selectedEvent.action === 'flag'"
                   class="px-2 py-0.5 rounded bg-amber-950/30 text-amber-400 border border-amber-900/20 text-[9px] font-mono font-bold"
                 >
                   SANITIZED
                 </span>
-                <span 
+                <span
                   v-else
                   class="px-2 py-0.5 rounded bg-emerald-950/30 text-emerald-400 border border-emerald-900/20 text-[9px] font-mono font-bold"
                 >
@@ -632,8 +629,8 @@ onUnmounted(() => {
                 </span>
               </h3>
             </div>
-            
-            <button 
+
+            <button
               @click="selectedEvent = null"
               class="text-zinc-500 hover:text-white transition-colors cursor-pointer text-xs font-mono font-bold hover:bg-zinc-900 px-2 py-1 rounded"
             >
@@ -695,7 +692,7 @@ onUnmounted(() => {
                 ]">
                   <span v-if="selectedEvent.action === 'block'">
                     [CONNECTION TERMINATED] Active rule block triggered. Request payload rejected by Ingress Sentry.
-                    
+
                     Reason: Matched signatures [{{ selectedEvent.matchedRules.join(', ') }}] with high threat score {{ selectedEvent.score }}.
                   </span>
                   <span v-else-if="selectedEvent.action === 'flag'">
@@ -716,7 +713,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Threat Stream live push warning flash animations */
+
 @keyframes threatRedFlash {
   0% { background-color: rgba(239, 68, 68, 0.25); border-color: rgba(239, 68, 68, 0.4); }
   100% { background-color: transparent; }

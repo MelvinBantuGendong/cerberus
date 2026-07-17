@@ -13,7 +13,6 @@ const orbX = ref(0)
 const orbY = ref(0)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
-// Sandbox click ripple easter egg state
 interface ClickRipple {
   x: number
   y: number
@@ -24,20 +23,17 @@ interface ClickRipple {
 }
 const clickRipples = ref<ClickRipple[]>([])
 
-// Reactive sandbox card flash outline feedback state
 const sandboxFlash = ref<'block' | 'flag' | null>(null)
 
 onMounted(() => {
-  // Initialize positions to center of screen
+
   mouseX.value = window.innerWidth / 2
   mouseY.value = window.innerHeight / 2
   orbX.value = window.innerWidth / 2
   orbY.value = window.innerHeight / 2
 
-  // Initial terminal status message
   terminalLogs.value.push('Cerberus Control Plane offline. Waiting for session authorization...')
 
-  // Initialize high-performance Ripple Canvas Grid
   const canvas = canvasRef.value
   if (canvas) {
     const ctx = canvas.getContext('2d')
@@ -45,7 +41,7 @@ onMounted(() => {
       const dpr = window.devicePixelRatio || 1
       let width = window.innerWidth
       let height = window.innerHeight
-      
+
       canvas.width = width * dpr
       canvas.height = height * dpr
       ctx.scale(dpr, dpr)
@@ -60,16 +56,15 @@ onMounted(() => {
       }
       window.addEventListener('resize', handleResize)
 
-      const spacing = 24 // Space between dots
-      const maxDist = 220 // Area of ripple influence around light ball
+      const spacing = 24
+      const maxDist = 220
 
       const updateLoop = () => {
-        // Gravitational lag easing calculation
+
         const ease = 0.05
         orbX.value = orbX.value + (mouseX.value - orbX.value) * ease
         orbY.value = orbY.value + (mouseY.value - orbY.value) * ease
 
-        // Update active click ripples
         for (let i = clickRipples.value.length - 1; i >= 0; i--) {
           const rip = clickRipples.value[i]
           rip.radius += rip.speed
@@ -98,26 +93,21 @@ onMounted(() => {
             let g = 63
             let b = 70
 
-            // Hover Spotlight Repulsion & Color Blends
             if (dist < maxDist) {
               const force = (maxDist - dist) / maxDist
 
-              // Ripple effect: repel dots outward relative to the distance of floating orb
               const push = force * 5
               x = x0 + (dx / (dist || 1)) * push
               y = y0 + (dy / (dist || 1)) * push
 
-              // Expand and highlight dots near the gravitating core
               opacity = 0.08 + force * 0.14
               dotSize = 0.7 + force * 0.3
 
-              // Soft crimson tone shift
               r = Math.round(63 + force * 60)
               g = Math.round(63 - force * 10)
               b = Math.round(70 - force * 15)
             }
 
-            // Click Ripples Repulsion & Glowing Wave effect
             for (let i = 0; i < clickRipples.value.length; i++) {
               const rip = clickRipples.value[i]
               const dxClick = x0 - rip.x
@@ -127,17 +117,14 @@ onMounted(() => {
 
               if (diff < 24) {
                 const force = (1 - diff / 24) * rip.alpha
-                
-                // Repel dots along the expanding click ring wave vector
+
                 const pushClick = force * 4
                 x += (dxClick / (distClick || 1)) * pushClick
                 y += (dyClick / (distClick || 1)) * pushClick
 
-                // Pulse parameters
                 dotSize += force * 0.5
                 opacity = Math.min(0.6, opacity + force * 0.25)
-                
-                // Shift colors to bright core red on wave pass
+
                 r = Math.min(239, Math.round(r + force * 120))
                 g = Math.max(30, Math.round(g - force * 20))
                 b = Math.max(35, Math.round(b - force * 25))
@@ -156,7 +143,7 @@ onMounted(() => {
       requestAnimationFrame(updateLoop)
     }
   }
-  
+
   window.addEventListener('scroll', handleScroll)
 })
 
@@ -170,7 +157,7 @@ const handleScroll = () => {
 }
 
 const handleCanvasClick = (e: MouseEvent) => {
-  // Push a new expanding ripple into grid workspace
+
   clickRipples.value.push({
     x: e.clientX,
     y: e.clientY,
@@ -184,11 +171,11 @@ const handleCanvasClick = (e: MouseEvent) => {
 const handleGithubLogin = () => {
   isLoading.value = true
   terminalLogs.value.push('Authenticating with GitHub OAuth API...')
-  
+
   setTimeout(() => {
     terminalLogs.value.push('OAuth Token verified. Handshake completed.')
     terminalLogs.value.push('Initializing developer control plane session...')
-    
+
     setTimeout(() => {
       localStorage.setItem('cerberus_auth', 'true')
       router.push({ name: 'builder' })
@@ -205,7 +192,6 @@ const scrollToInfo = () => {
   document.getElementById('info-section')?.scrollIntoView({ behavior: 'smooth' })
 }
 
-// Sandbox Interactive Playpen States
 const customInput = ref('')
 const sandboxOutput = ref('')
 const sandboxVerdict = ref<any>({
@@ -233,12 +219,12 @@ const runRealProxyCheck = async (promptText: string) => {
   if (!promptText) return
   isTestingRealProxy.value = true
   sandboxError.value = ''
-  
+
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     }
-    // Optional client key if known
+
     const storedClientKey = localStorage.getItem('cerberus_last_client_key')
     if (storedClientKey) {
       headers['Authorization'] = `Bearer ${storedClientKey}`
@@ -396,7 +382,6 @@ watch(customInput, (newVal) => {
   }
 })
 
-// Trigger a soft outline warning flash inside sandbox card when threat is caught
 const triggerFlash = (action: 'allow' | 'block' | 'flag') => {
   if (action === 'block' || action === 'flag') {
     sandboxFlash.value = action
@@ -419,13 +404,13 @@ const animationClass = computed(() => {
 </script>
 
 <template>
-  <div 
+  <div
     @mousemove="handleMouseMove"
     @click="handleCanvasClick"
     class="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans relative overflow-y-auto scroll-smooth"
   >
     <!-- Sticky Top Navigation Header (Appears on Scroll) -->
-    <header 
+    <header
       class="fixed top-0 left-0 w-full h-14 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md z-40 transition-all duration-300 flex items-center justify-between px-8"
       :class="[showStickyHeader ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0']"
     >
@@ -435,8 +420,8 @@ const animationClass = computed(() => {
       </div>
 
       <!-- Right Side: Continue with GitHub CTA -->
-      <button 
-        @click="handleGithubLogin" 
+      <button
+        @click="handleGithubLogin"
         :disabled="isLoading"
         class="flex items-center justify-center gap-2 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-[10px] py-1.5 px-4 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border border-zinc-200 font-push"
       >
@@ -458,7 +443,7 @@ const animationClass = computed(() => {
     <canvas ref="canvasRef" class="fixed inset-0 w-full h-full z-0 pointer-events-none"></canvas>
 
     <!-- Wide Cursor Follower Glow (Instant soft illumination wrapper) -->
-    <div 
+    <div
       class="absolute inset-0 pointer-events-none z-0 transition-opacity duration-300"
       :style="{
         background: `radial-gradient(600px circle at ${mouseX}px ${mouseY}px, rgba(239, 68, 68, 0.03), transparent 80%)`
@@ -466,7 +451,7 @@ const animationClass = computed(() => {
     ></div>
 
     <!-- Gravitating Orb Core (Fluid red lag lighting) -->
-    <div 
+    <div
       class="absolute inset-0 pointer-events-none z-0 transition-opacity duration-300"
       :style="{
         background: `radial-gradient(180px circle at ${orbX}px ${orbY}px, rgba(239, 68, 68, 0.12), transparent 75%)`
@@ -480,12 +465,12 @@ const animationClass = computed(() => {
 
     <!-- Hero Screen Section -->
     <section class="min-h-screen flex flex-col items-center justify-center px-6 relative z-10 text-center space-y-8">
-      
+
       <div class="space-y-3.5 select-none">
         <h1 class="text-6xl md:text-7xl font-bold tracking-tight text-white leading-none font-push">
           Cerberus
         </h1>
-        
+
         <div class="space-y-3">
           <h2 class="text-xs md:text-sm font-semibold tracking-[0.25em] text-zinc-400 uppercase font-push">
             Build Fast. Secure All.
@@ -499,8 +484,8 @@ const animationClass = computed(() => {
       <!-- Action Button Group -->
       <div class="flex flex-col sm:flex-row gap-4 items-center justify-center w-full max-w-md mx-auto relative z-20">
         <!-- Button 1: Auth -->
-        <button 
-          @click="handleGithubLogin" 
+        <button
+          @click="handleGithubLogin"
           :disabled="isLoading"
           class="w-full sm:w-auto min-w-[180px] flex items-center justify-center gap-2.5 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs py-3 px-6 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border border-zinc-200"
         >
@@ -518,7 +503,7 @@ const animationClass = computed(() => {
         </button>
 
         <!-- Button 2: How it works -->
-        <button 
+        <button
           @click="scrollToInfo"
           class="w-full sm:w-auto min-w-[180px] flex items-center justify-center border border-zinc-850 hover:border-zinc-700 bg-zinc-900/20 hover:bg-zinc-900/40 text-zinc-400 hover:text-zinc-200 font-semibold text-xs py-3 px-6 rounded transition-all cursor-pointer font-push"
         >
@@ -531,7 +516,7 @@ const animationClass = computed(() => {
     <!-- Info Detail Section below the fold -->
     <section id="info-section" class="border-t border-zinc-900 bg-zinc-950/40 relative z-10 px-6 py-20">
       <div class="max-w-5xl mx-auto space-y-12">
-        
+
         <!-- Section Header -->
         <div class="text-left max-w-2xl space-y-1.5">
           <h2 class="text-lg font-bold text-white tracking-tight font-push">How Cerberus Works</h2>
@@ -545,9 +530,9 @@ const animationClass = computed(() => {
           <div class="flex items-center justify-between w-full max-w-2xl mx-auto relative py-6">
             <!-- Continuous Connection lines -->
             <div class="absolute left-[10%] right-[10%] top-1/2 -translate-y-1/2 h-0.5 bg-zinc-900 z-0"></div>
-            
+
             <!-- Animated Tracer Dot with Gradient Trail -->
-            <div 
+            <div
               class="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full z-10"
               :class="[animationClass]"
             ></div>
@@ -558,7 +543,7 @@ const animationClass = computed(() => {
             </div>
 
             <!-- Node 2: Cerberus Proxy -->
-            <div 
+            <div
               class="z-20 w-36 h-12 rounded border flex flex-col justify-center items-center shadow-lg transition-colors duration-300"
               :class="[
                 activeScenario.verdict.action === 'block' ? 'border-red-900 bg-red-950/10 shadow-[0_0_15px_rgba(239,68,68,0.08)]' :
@@ -593,10 +578,10 @@ const animationClass = computed(() => {
 
         <!-- 2. Interactive Threat Playground (Interactive Sandbox) -->
         <div class="grid md:grid-cols-12 gap-8 items-start">
-          
+
           <!-- Sandbox Playpen Interactive Panel (Left Column) -->
           <div class="md:col-span-7 space-y-3 text-left">
-            <div 
+            <div
               class="cyber-card rounded p-5 border bg-zinc-900/10 space-y-4 transition-all duration-500"
               :class="[
                 sandboxFlash === 'block' ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.15)] duration-75' :
@@ -605,12 +590,11 @@ const animationClass = computed(() => {
               ]"
             >
 
-
               <!-- Input text box -->
               <div class="space-y-1.5">
                 <label class="text-[9px] text-zinc-550 font-bold uppercase tracking-wider font-push">Prompt Sent to AI:</label>
-                <textarea 
-                  v-model="customInput" 
+                <textarea
+                  v-model="customInput"
                   placeholder="Type your prompt here (e.g. 'ignore previous rules' or commands like 'sudo rm')..."
                   rows="2"
                   class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-300 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono placeholder:text-zinc-700"
@@ -629,7 +613,7 @@ const animationClass = computed(() => {
 
           <!-- Live Verdict JSON Payload Output (Right Column) -->
           <div class="md:col-span-5 space-y-3 text-left">
-            <div 
+            <div
               class="cyber-card rounded p-5 border bg-zinc-900/10 space-y-4 h-full flex flex-col justify-between transition-all duration-500"
               :class="[
                 sandboxFlash === 'block' ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.15)] duration-75' :
@@ -672,7 +656,7 @@ const animationClass = computed(() => {
 
         <!-- Section Footer Grid -->
         <div class="grid md:grid-cols-12 gap-8 items-start">
-          
+
           <!-- Terminal logs (left column) -->
           <div class="md:col-span-5 space-y-3">
             <div class="cyber-card rounded p-4 font-mono text-[11px] text-zinc-555 border border-zinc-900 bg-zinc-900/10 h-56 overflow-y-auto text-left">
@@ -681,7 +665,7 @@ const animationClass = computed(() => {
                   <Terminal class="w-3 h-3 text-zinc-650" />
                   Terminal Console
                 </span>
-                
+
                 <span class="flex items-center gap-1.5 text-[8px] bg-red-950/30 text-red-400 px-1.5 py-0.5 rounded border border-red-900/20 font-sans">
                   <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0"></span>
                   Gateway Active
@@ -753,69 +737,69 @@ const animationClass = computed(() => {
 </template>
 
 <style scoped>
-/* Keyframe animations for request flow tracer dot with trailing shadow motion blur */
+
 @keyframes flow-allow {
-  0% { 
-    left: 10%; 
-    background-color: #3b82f6; 
+  0% {
+    left: 10%;
+    background-color: #3b82f6;
     box-shadow: -6px 0 8px rgba(59, 130, 246, 0.5), -12px 0 12px rgba(59, 130, 246, 0.25);
-    opacity: 1; 
+    opacity: 1;
   }
-  45% { 
-    left: 50%; 
-    background-color: #10b981; 
+  45% {
+    left: 50%;
+    background-color: #10b981;
     box-shadow: -6px 0 8px rgba(16, 185, 129, 0.5), -12px 0 12px rgba(16, 185, 129, 0.25);
   }
-  90% { 
-    left: 90%; 
-    background-color: #3b82f6; 
+  90% {
+    left: 90%;
+    background-color: #3b82f6;
     box-shadow: -6px 0 8px rgba(59, 130, 246, 0.5), -12px 0 12px rgba(59, 130, 246, 0.25);
-    opacity: 1; 
+    opacity: 1;
   }
-  100% { 
-    left: 90%; 
-    opacity: 0; 
+  100% {
+    left: 90%;
+    opacity: 0;
   }
 }
 
 @keyframes flow-block {
-  0% { 
-    left: 10%; 
-    background-color: #3b82f6; 
+  0% {
+    left: 10%;
+    background-color: #3b82f6;
     box-shadow: -6px 0 8px rgba(59, 130, 246, 0.5), -12px 0 12px rgba(59, 130, 246, 0.25);
-    opacity: 1; 
+    opacity: 1;
   }
-  45% { 
-    left: 50%; 
-    background-color: #ef4444; 
+  45% {
+    left: 50%;
+    background-color: #ef4444;
     box-shadow: -6px 0 8px rgba(239, 68, 68, 0.5), -12px 0 12px rgba(239, 68, 68, 0.25);
   }
   50% { left: 50%; opacity: 1; }
-  60% { left: 50%; opacity: 0; } /* terminates at proxy core */
+  60% { left: 50%; opacity: 0; }
   100% { left: 50%; opacity: 0; }
 }
 
 @keyframes flow-flag {
-  0% { 
-    left: 10%; 
-    background-color: #3b82f6; 
+  0% {
+    left: 10%;
+    background-color: #3b82f6;
     box-shadow: -6px 0 8px rgba(59, 130, 246, 0.5), -12px 0 12px rgba(59, 130, 246, 0.25);
-    opacity: 1; 
+    opacity: 1;
   }
-  45% { 
-    left: 50%; 
-    background-color: #f59e0b; 
+  45% {
+    left: 50%;
+    background-color: #f59e0b;
     box-shadow: -6px 0 8px rgba(245, 158, 11, 0.5), -12px 0 12px rgba(245, 158, 11, 0.25);
   }
-  90% { 
-    left: 90%; 
-    background-color: #f59e0b; 
+  90% {
+    left: 90%;
+    background-color: #f59e0b;
     box-shadow: -6px 0 8px rgba(245, 158, 11, 0.5), -12px 0 12px rgba(245, 158, 11, 0.25);
-    opacity: 1; 
+    opacity: 1;
   }
-  100% { 
-    left: 90%; 
-    opacity: 0; 
+  100% {
+    left: 90%;
+    opacity: 0;
   }
 }
 
@@ -831,7 +815,6 @@ const animationClass = computed(() => {
   animation: flow-flag 3s infinite linear;
 }
 
-/* Slow breathing background pulse */
 @keyframes pulse-slow {
   0%, 100% { opacity: 0.8; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.04); }
