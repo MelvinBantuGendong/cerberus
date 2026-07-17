@@ -6,6 +6,10 @@
 }
 
 @layer base {
+  html {
+    font-size: 135%;
+  }
+
   body {
     background-color: #09090b; /* zinc-950 */
     background-image: radial-gradient(circle at 80% 20%, rgba(244, 63, 94, 0.035), transparent 700px),

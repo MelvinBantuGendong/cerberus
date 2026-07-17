@@ -412,10 +412,10 @@ const copySnippet = () => {
 
 
       <!-- Layout Panel Grid -->
-      <div class="grid lg:grid-cols-12">
+      <div class="grid xl:grid-cols-12">
 
         <!-- Left Column: Instance Info & Client Keys -->
-        <div class="lg:col-span-3 p-6 border-r border-zinc-900 flex flex-col space-y-6 text-left">
+        <div class="xl:col-span-3 p-6 border-b xl:border-b-0 xl:border-r border-zinc-900 flex flex-col space-y-6 text-left">
           <!-- Active Gateway Instance Status Info -->
           <div>
             <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-350 mb-2">Instance Profile</h3>
@@ -452,19 +452,19 @@ const copySnippet = () => {
             </div>
 
             <!-- Create new key form -->
-            <div class="flex gap-2">
+            <div class="space-y-2">
               <input
                 type="text"
                 v-model="newKeyLabel"
                 placeholder="Key label..."
                 @keyup.enter="generateNewKey"
-                class="flex-1 text-xs bg-zinc-950 border border-zinc-900 text-zinc-300 p-1.5 rounded focus:outline-none font-mono"
+                class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-300 p-2 rounded focus:outline-none font-mono"
               />
               <button
                 @click="generateNewKey"
-                class="text-xs font-bold text-rose-455 border border-rose-900/40 bg-rose-950/10 hover:bg-rose-900/25 hover:text-rose-200 px-2.5 py-1.5 rounded cursor-pointer transition-all font-push"
+                class="w-full text-xs font-bold text-rose-455 border border-rose-900/40 bg-rose-950/10 hover:bg-rose-900/25 hover:text-rose-200 py-2 rounded cursor-pointer transition-all font-push text-center"
               >
-                Create
+                Create Key
               </button>
             </div>
 
@@ -496,7 +496,7 @@ const copySnippet = () => {
         </div>
 
         <!-- Right Side: Config Forms and Telemetry Details -->
-        <div class="lg:col-span-9 flex flex-col p-6 space-y-6">
+        <div class="xl:col-span-9 flex flex-col p-6 space-y-6">
 
           <!-- Proxy Settings Form Card -->
           <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 text-left space-y-5">
@@ -546,7 +546,7 @@ const copySnippet = () => {
                 />
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
                   <label class="text-xs font-semibold text-zinc-350 font-push">Max Payload (Bytes)</label>
                   <input

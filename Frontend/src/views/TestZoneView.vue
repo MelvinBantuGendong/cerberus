@@ -307,9 +307,9 @@ onMounted(loadCatalog)
     <main class="flex-1 flex flex-col z-10 min-w-0 overflow-y-auto">
 
 
-      <div class="grid lg:grid-cols-12 flex-1 min-h-0">
+      <div class="grid xl:grid-cols-12 flex-1 min-h-0">
         <!-- Left: Detector toggles -->
-        <div class="lg:col-span-5 p-6 border-r border-zinc-900 space-y-6 text-left overflow-y-auto">
+        <div class="xl:col-span-5 p-6 border-b xl:border-b-0 xl:border-r border-zinc-900 space-y-6 text-left overflow-y-auto">
           <!-- Admin token -->
           <div class="space-y-1.5">
             <label class="text-[10px] font-semibold text-zinc-350 font-push uppercase tracking-wider">Admin Token</label>
@@ -333,8 +333,8 @@ onMounted(loadCatalog)
           <!-- Gateway Settings Sync -->
           <div class="space-y-3.5 border-t border-zinc-900 pt-5">
             <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">Gateway Settings</h3>
-            <div class="grid grid-cols-2 gap-4">
-              <div class="col-span-2 space-y-1.5">
+            <div class="space-y-3.5">
+              <div class="space-y-1.5">
                 <label class="text-[10px] font-semibold text-zinc-400 font-push">Upstream Destination</label>
                 <input 
                   type="text" 
@@ -453,7 +453,7 @@ onMounted(loadCatalog)
         </div>
 
         <!-- Right: Attack tester -->
-        <div class="lg:col-span-7 p-6 space-y-5 text-left overflow-y-auto">
+        <div class="xl:col-span-7 p-6 space-y-5 text-left overflow-y-auto">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-1.5">
               <label class="text-xs font-semibold text-zinc-350 font-push uppercase tracking-wider">Model</label>

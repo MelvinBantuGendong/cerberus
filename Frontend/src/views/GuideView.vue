@@ -60,7 +60,7 @@ const vars: EnvVar[] = [
   },
   {
     name: 'CERBERUS_API_KEYS',
-    purpose: 'Bootstrap client keys (comma-separated) that callers must present to Cerberus. Leave empty to run open; add keys here or generate them on Manage Proxy.',
+    purpose: 'Bootstrap client keys (comma-separated) that callers must present to Cerberus. Leave empty to run open, add keys here or generate them on Manage Proxy.',
     example: 'cbk_devtest1,cbk_devtest2',
     fallback: 'empty = auth OFF (all callers allowed)',
     tier: 'optional',
@@ -165,7 +165,7 @@ const copy = (text: string, key: string) => {
             class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
           >
             <Bug class="w-3.5 h-3.5" />
-            Test Zone
+            Rule Set & Playground
           </router-link>
         </nav>
       </div>
@@ -195,10 +195,10 @@ const copy = (text: string, key: string) => {
         <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 space-y-2">
           <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">How config works</h3>
           <p class="text-[11px] text-zinc-400 leading-relaxed">
-            The gateway reads these from the <span class="text-zinc-200">environment</span>. Env is the boot seed;
+            The gateway reads these from the <span class="text-zinc-200">environment</span>. Env is the boot seed,
             once <code class="text-zinc-300">CERBERUS_STATE_PATH</code> is set, the saved store becomes the source of
             truth and you change settings live from <span class="text-zinc-200">Manage Proxy</span> - no restart. Only
-            three variables really matter to get started; the rest have safe defaults.
+            three variables really matter to get started, the rest have safe defaults.
           </p>
         </div>
 
