@@ -27,7 +27,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler, err := gateway.New(cfg, st, detect.Default(), detect.Outbound)
+	catalog := make([]gateway.DetectorInfo, 0, len(detect.Catalog()))
+	for _, d := range detect.Catalog() {
+		catalog = append(catalog, gateway.DetectorInfo{ID: d.ID, Name: d.Name, Description: d.Description, Direction: d.Direction})
+	}
+
+	handler, err := gateway.New(cfg, st, detect.Default(), detect.Outbound, catalog)
 	if err != nil {
 		slog.Error("gateway", "err", err)
 		os.Exit(1)

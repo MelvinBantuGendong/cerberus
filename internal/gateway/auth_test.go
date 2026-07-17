@@ -39,7 +39,7 @@ func okGateway(t *testing.T, cfg config.Config) (*httptest.Server, func()) {
 	if cfg.IncomingPrefix == "" {
 		cfg.IncomingPrefix = "/v1"
 	}
-	gw, err := New(cfg, mustStore(t, cfg), nil, nil)
+	gw, err := New(cfg, mustStore(t, cfg), nil, nil, nil)
 	if err != nil {
 		up.Close()
 		t.Fatalf("New: %v", err)
@@ -122,7 +122,7 @@ func TestManagedModeValidatesThenInjects(t *testing.T) {
 		APIKeys:        []string{"sk-cerberus"},
 		UpstreamKey:    "sk-upstream",
 	}
-	gw, err := New(cfg, mustStore(t, cfg), nil, nil)
+	gw, err := New(cfg, mustStore(t, cfg), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

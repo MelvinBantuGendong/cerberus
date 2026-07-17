@@ -25,10 +25,11 @@ type Key struct {
 }
 
 type settings struct {
-	Upstream     string              `json:"upstream"`
-	UpstreamKey  string              `json:"upstream_key"`
-	MaxBodyBytes int64               `json:"max_body_bytes"`
-	OutboundMode config.OutboundMode `json:"outbound_mode"`
+	Upstream      string              `json:"upstream"`
+	UpstreamKey   string              `json:"upstream_key"`
+	MaxBodyBytes  int64               `json:"max_body_bytes"`
+	OutboundMode  config.OutboundMode `json:"outbound_mode"`
+	DisabledRules []string            `json:"disabled_rules"`
 }
 
 type persisted struct {
@@ -45,11 +46,12 @@ type Store struct {
 }
 
 type Snapshot struct {
-	Upstream     *url.URL
-	UpstreamKey  string
-	MaxBodyBytes int64
-	OutboundMode config.OutboundMode
-	AuthEnabled  bool
+	Upstream      *url.URL
+	UpstreamKey   string
+	MaxBodyBytes  int64
+	OutboundMode  config.OutboundMode
+	DisabledRules map[string]bool
+	AuthEnabled   bool
 }
 
 func FromConfig(cfg config.Config) (*Store, error) {
@@ -131,11 +133,12 @@ func (s *Store) Snapshot() Snapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return Snapshot{
-		Upstream:     s.upstream,
-		UpstreamKey:  s.set.UpstreamKey,
-		MaxBodyBytes: s.set.MaxBodyBytes,
-		OutboundMode: s.set.OutboundMode,
-		AuthEnabled:  len(s.keys) > 0,
+		Upstream:      s.upstream,
+		UpstreamKey:   s.set.UpstreamKey,
+		MaxBodyBytes:  s.set.MaxBodyBytes,
+		OutboundMode:  s.set.OutboundMode,
+		DisabledRules: disabledSet(s.set.DisabledRules),
+		AuthEnabled:   len(s.keys) > 0,
 	}
 }
 
@@ -157,26 +160,59 @@ type View struct {
 	UpstreamKeySet bool                `json:"upstream_key_set"`
 	MaxBodyBytes   int64               `json:"max_body_bytes"`
 	OutboundMode   config.OutboundMode `json:"outbound_mode"`
+	DisabledRules  []string            `json:"disabled_rules"`
 	KeyCount       int                 `json:"key_count"`
 }
 
 func (s *Store) View() View {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	rules := make([]string, len(s.set.DisabledRules))
+	copy(rules, s.set.DisabledRules)
 	return View{
 		Upstream:       s.set.Upstream,
 		UpstreamKeySet: s.set.UpstreamKey != "",
 		MaxBodyBytes:   s.set.MaxBodyBytes,
 		OutboundMode:   s.set.OutboundMode,
+		DisabledRules:  rules,
 		KeyCount:       len(s.keys),
 	}
 }
 
+func normalizeRules(rules []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(rules))
+	for _, r := range rules {
+		r = strings.TrimSpace(r)
+		if r == "" || seen[r] {
+			continue
+		}
+		seen[r] = true
+		out = append(out, r)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func disabledSet(rules []string) map[string]bool {
+	if len(rules) == 0 {
+		return nil
+	}
+	m := make(map[string]bool, len(rules))
+	for _, r := range rules {
+		m[r] = true
+	}
+	return m
+}
+
 type SettingsPatch struct {
-	Upstream     *string
-	UpstreamKey  *string
-	MaxBodyBytes *int64
-	OutboundMode *config.OutboundMode
+	Upstream      *string
+	UpstreamKey   *string
+	MaxBodyBytes  *int64
+	OutboundMode  *config.OutboundMode
+	DisabledRules *[]string
 }
 
 func (s *Store) UpdateSettings(p SettingsPatch) error {
@@ -195,6 +231,9 @@ func (s *Store) UpdateSettings(p SettingsPatch) error {
 	}
 	if p.OutboundMode != nil {
 		next.OutboundMode = *p.OutboundMode
+	}
+	if p.DisabledRules != nil {
+		next.DisabledRules = normalizeRules(*p.DisabledRules)
 	}
 
 	u, err := url.Parse(next.Upstream)

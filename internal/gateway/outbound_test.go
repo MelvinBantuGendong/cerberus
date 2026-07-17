@@ -52,7 +52,7 @@ func outboundGateway(t *testing.T, mode config.OutboundMode, up http.HandlerFunc
 	upSrv := httptest.NewServer(up)
 	u, _ := url.Parse(upSrv.URL)
 	cfg := config.Config{UpstreamBase: u, IncomingPrefix: "/v1", MaxBodyBytes: 1 << 20, OutboundMode: mode}
-	gw, err := New(cfg, mustStore(t, cfg), nil, of)
+	gw, err := New(cfg, mustStore(t, cfg), nil, of, nil)
 	if err != nil {
 		upSrv.Close()
 		t.Fatalf("New: %v", err)

@@ -60,6 +60,8 @@ func newSystemPromptLeak(systemPrompt string) systemPromptLeak {
 	return systemPromptLeak{shingles: set}
 }
 
+func (systemPromptLeak) ID() string { return "system_prompt_leak" }
+
 func (d systemPromptLeak) Check(s ingest.Segment) verdict.Verdict {
 	if len(d.shingles) == 0 {
 		return verdict.Allowing(verdict.Outbound, s.Trust)

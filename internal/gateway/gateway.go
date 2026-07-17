@@ -21,7 +21,7 @@ import (
 
 type OutboundFactory func(systemPrompt string) []ingest.Detector
 
-func New(cfg config.Config, st *store.Store, inbound []ingest.Detector, outbound OutboundFactory) (http.Handler, error) {
+func New(cfg config.Config, st *store.Store, inbound []ingest.Detector, outbound OutboundFactory, catalog []DetectorInfo) (http.Handler, error) {
 	hasOutbound := outbound != nil
 
 	proxy := &httputil.ReverseProxy{
@@ -59,7 +59,7 @@ func New(cfg config.Config, st *store.Store, inbound []ingest.Detector, outbound
 		_, _ = w.Write([]byte("ok\n"))
 	})
 	if cfg.AdminToken != "" {
-		mux.Handle("/admin/", adminHandler(cfg.AdminToken, st))
+		mux.Handle("/admin/", adminHandler(cfg.AdminToken, st, catalog))
 	}
 	mux.Handle("/", withAudit(withAuth(st, withScan(st, inbound, hasOutbound, proxy))))
 
@@ -116,12 +116,13 @@ func withScan(st *store.Store, inbound []ingest.Detector, hasOutbound bool, next
 			rs.systemPrompt = ingest.SystemPrompt(body)
 		}
 
-		if len(body) > 0 && len(inbound) > 0 {
+		dets := ingest.Enabled(inbound, snap.DisabledRules)
+		if len(body) > 0 && len(dets) > 0 {
 			segs, perr := ingest.Ingest(body)
 			if perr != nil {
 				slog.Debug("scan skipped: body is not a chat-completions request", "path", r.URL.Path, "err", perr)
 			} else {
-				v := ingest.Dispatch(verdict.Inbound, segs, inbound)
+				v := ingest.Dispatch(verdict.Inbound, segs, dets)
 				if rs != nil {
 					rs.inbound = &v
 				}
@@ -137,7 +138,8 @@ func withScan(st *store.Store, inbound []ingest.Detector, hasOutbound bool, next
 
 func modifyResponse(st *store.Store, outbound OutboundFactory) func(*http.Response) error {
 	return func(resp *http.Response) error {
-		mode := st.Snapshot().OutboundMode
+		snap := st.Snapshot()
+		mode := snap.OutboundMode
 		if mode == config.OutboundOff {
 			return nil
 		}
@@ -146,7 +148,7 @@ func modifyResponse(st *store.Store, outbound OutboundFactory) func(*http.Respon
 		if rs := stateFrom(resp.Request.Context()); rs != nil {
 			sp = rs.systemPrompt
 		}
-		detectors := outbound(sp)
+		detectors := ingest.Enabled(outbound(sp), snap.DisabledRules)
 		record := func(v verdict.Verdict) {
 			if rs := stateFrom(resp.Request.Context()); rs != nil {
 				rs.outbound = &v
