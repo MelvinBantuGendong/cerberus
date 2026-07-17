@@ -5,7 +5,6 @@ import {
   Play,
   Copy,
   Check,
-  Cpu,
   User,
   LogOut,
   Sliders,
@@ -20,7 +19,6 @@ const handleLogout = () => {
   router.push({ name: 'login' })
 }
 
-const shieldId = ref('shield_a8b92c')
 const isDeploying = ref(false)
 const justDeployed = ref(false)
 const copied = ref(false)
@@ -48,20 +46,7 @@ const activeProjectId = ref('gateway_cluster')
 const activeProject = computed(() => {
   return projects.value.find(p => p.id === activeProjectId.value) || projects.value[0]
 })
-const copiedUrl = ref('')
 
-const copyProjectUrl = (url: string) => {
-  navigator.clipboard.writeText(url)
-  copiedUrl.value = url
-  setTimeout(() => {
-    copiedUrl.value = ''
-  }, 2000)
-}
-
-const selectProject = (project: Project) => {
-  activeProjectId.value = project.id
-  shieldId.value = project.id
-}
 
 const guardsConfig = ref({
   promptInjection: {
@@ -355,14 +340,7 @@ const copySnippet = () => {
             Test Zone
           </router-link>
 
-          <router-link
-            :to="{ name: 'analytics' }"
-            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
-          >
-            <Cpu class="w-3.5 h-3.5" />
-            Threat Intel
-            <span class="ml-auto text-[9px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded">Live</span>
-          </router-link>
+
         </nav>
       </div>
 
@@ -389,60 +367,7 @@ const copySnippet = () => {
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col z-10 min-w-0 overflow-y-auto">
 
-      <!-- Top Header Bar -->
-      <header class="h-16 border-b border-zinc-900 bg-zinc-950/20 backdrop-blur-md flex items-center justify-between px-8 shrink-0">
-        <div>
-          <h2 class="text-sm font-bold text-white font-push">
-            Control Plane
-          </h2>
-          <p class="text-[10px] text-zinc-500">Secure agent endpoints via multi-project proxy matrices</p>
-        </div>
 
-        <div class="flex items-center gap-4 font-push"></div>
-      </header>
-
-      <div class="px-8 pt-6 pb-2 text-left shrink-0">
-        <div class="flex items-center justify-between mb-3.5">
-          <h3 class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 font-push">Active Proxy</h3>
-
-        </div>
-
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div
-            v-for="project in projects"
-            :key="project.id"
-            @click="selectProject(project)"
-            class="cyber-card rounded p-3 border text-left cursor-pointer transition-all hover:bg-zinc-900/10 flex flex-col justify-between space-y-2.5"
-            :class="[
-              activeProjectId === project.id ? 'border-zinc-600 bg-zinc-900/10' : 'border-zinc-900 bg-zinc-950/20'
-            ]"
-          >
-            <div class="flex items-center justify-between">
-              <h4 class="text-[11px] font-bold text-white font-push truncate pr-2">{{ project.name }}</h4>
-              <span class="text-[8px] font-bold px-1.5 py-0.5 rounded border font-sans uppercase shrink-0" :class="[
-                project.status === 'active' ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/30' : 'bg-red-950/20 text-red-400 border-red-900/30'
-              ]">
-                {{ project.status === 'active' ? '🟢 Active' : '🔴 Inactive' }}
-              </span>
-            </div>
-
-            <div class="space-y-1">
-              <span class="text-[8px] text-zinc-650 uppercase font-mono tracking-wider font-semibold">Custom Proxy URL</span>
-              <div class="flex items-center justify-between bg-zinc-950 border border-zinc-900 rounded p-1.5 text-[9px] font-mono text-zinc-400">
-                <span class="truncate pr-1.5">{{ project.proxyUrl }}</span>
-                <button
-                  @click.stop="copyProjectUrl(project.proxyUrl)"
-                  class="text-zinc-600 hover:text-white p-0.5 rounded transition-all shrink-0 cursor-pointer"
-                  title="Copy URL"
-                >
-                  <Check v-if="copiedUrl === project.proxyUrl" class="w-3 h-3 text-zinc-300" />
-                  <Copy v-else class="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Layout Panel Grid -->
       <div class="grid lg:grid-cols-12">
@@ -451,26 +376,26 @@ const copySnippet = () => {
         <div class="lg:col-span-3 p-6 border-r border-zinc-900 flex flex-col space-y-6 text-left">
           <!-- Active Gateway Instance Status Info -->
           <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 mb-2">Instance Profile</h3>
-            <div class="space-y-2 text-[10px] font-mono">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-350 mb-2">Instance Profile</h3>
+            <div class="space-y-2 text-xs font-mono">
               <div class="p-2.5 rounded bg-zinc-950/40 border border-zinc-900 space-y-1">
                 <div class="flex items-center justify-between">
-                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Status</span>
-                  <span class="flex items-center gap-1.5 text-emerald-450 font-bold font-sans text-[8px] uppercase">
+                  <span class="text-zinc-650 uppercase text-[10px] font-sans font-bold">Status</span>
+                  <span class="flex items-center gap-1.5 text-emerald-400 font-bold font-sans text-[10px] uppercase">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
                     Online
                   </span>
                 </div>
                 <div class="flex items-center justify-between pt-1">
-                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Listen IP</span>
+                  <span class="text-zinc-650 uppercase text-[10px] font-sans font-bold">Listen IP</span>
                   <span class="text-zinc-300">127.0.0.1:8080</span>
                 </div>
                 <div class="flex items-center justify-between pt-1">
-                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Prefix</span>
+                  <span class="text-zinc-650 uppercase text-[10px] font-sans font-bold">Prefix</span>
                   <span class="text-zinc-300">/v1</span>
                 </div>
                 <div class="flex items-center justify-between pt-1">
-                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Config Store</span>
+                  <span class="text-zinc-650 uppercase text-[10px] font-sans font-bold">Config Store</span>
                   <span class="text-zinc-300">state.json</span>
                 </div>
               </div>
@@ -480,8 +405,8 @@ const copySnippet = () => {
           <!-- Go Gateway Client API Keys Manager -->
           <div class="border-t border-zinc-900 pt-4 flex flex-col space-y-3 shrink-0">
             <div>
-              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 mb-1">Gateway Client Keys</h3>
-              <p class="text-[9px] text-zinc-600 leading-relaxed">Generated tokens authorized to proxy prompts through Cerberus.</p>
+              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-350 mb-1">Gateway Client Keys</h3>
+              <p class="text-xs text-zinc-500 leading-relaxed">Generated tokens authorized to proxy prompts through Cerberus.</p>
             </div>
 
             <!-- Create new key form -->
@@ -491,11 +416,11 @@ const copySnippet = () => {
                 v-model="newKeyLabel"
                 placeholder="Key label..."
                 @keyup.enter="generateNewKey"
-                class="flex-1 text-[9px] bg-zinc-950 border border-zinc-900 text-zinc-300 p-1.5 rounded focus:outline-none font-mono"
+                class="flex-1 text-xs bg-zinc-950 border border-zinc-900 text-zinc-300 p-1.5 rounded focus:outline-none font-mono"
               />
               <button
                 @click="generateNewKey"
-                class="text-[9px] font-bold text-zinc-950 bg-zinc-100 hover:bg-white px-2.5 py-1.5 rounded cursor-pointer transition-all"
+                class="text-xs font-bold text-zinc-950 bg-zinc-100 hover:bg-white px-2.5 py-1.5 rounded cursor-pointer transition-all"
               >
                 Create
               </button>
@@ -506,11 +431,11 @@ const copySnippet = () => {
               <div
                 v-for="key in apiKeys"
                 :key="key.id"
-                class="flex items-center justify-between p-2 rounded bg-zinc-950/40 border border-zinc-900 text-[9px] font-mono"
+                class="flex items-center justify-between p-2 rounded bg-zinc-950/40 border border-zinc-900 text-xs font-mono"
               >
                 <div class="text-left truncate pr-2">
-                  <span class="text-zinc-300 block font-sans font-bold leading-normal truncate">{{ key.label }}</span>
-                  <span class="text-zinc-600 block text-[8px] mt-0.5 font-mono">ID: {{ key.id }}</span>
+                  <span class="text-zinc-300 block font-sans font-bold text-xs leading-normal truncate">{{ key.label }}</span>
+                  <span class="text-zinc-600 block text-[10px] mt-0.5 font-mono">ID: {{ key.id }}</span>
                 </div>
                 <button
                   @click="deleteApiKey(key.id)"
@@ -530,65 +455,65 @@ const copySnippet = () => {
           <!-- Proxy Settings Form Card -->
           <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 text-left space-y-5">
             <div>
-              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">Gateway Core Configuration</h3>
-              <p class="text-[9.5px] text-zinc-500 leading-normal mt-0.5">Parameters synced in real-time with the running Go proxy instance</p>
+              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-300 font-push">Gateway Core Configuration</h3>
+              <p class="text-xs text-zinc-500 leading-normal mt-0.5">Parameters synced in real-time with the running Go proxy instance</p>
             </div>
 
             <div class="grid md:grid-cols-2 gap-5">
               <div class="space-y-1.5 md:col-span-2">
-                <label class="text-[10px] font-semibold text-zinc-350 font-push">Proxy Instance Name</label>
+                <label class="text-xs font-semibold text-zinc-350 font-push">Proxy Instance Name</label>
                 <input
                   type="text"
                   v-model="activeProject.name"
                   placeholder="Enter proxy instance name..."
-                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
+                  class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
                 />
               </div>
 
               <div class="space-y-1.5">
-                <label class="text-[10px] font-semibold text-zinc-350 font-push">Admin Secret Token</label>
+                <label class="text-xs font-semibold text-zinc-350 font-push">Admin Secret Token</label>
                 <input
                   type="password"
                   v-model="adminToken"
                   placeholder="Enter CERBERUS_ADMIN_TOKEN..."
-                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
+                  class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
                 />
               </div>
 
               <div class="space-y-1.5">
-                <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Destination URL</label>
+                <label class="text-xs font-semibold text-zinc-350 font-push">Upstream Destination URL</label>
                 <input
                   type="text"
                   v-model="guardsConfig.gatewaySettings.upstream"
                   placeholder="e.g. https://openrouter.ai/api/v1"
-                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
+                  class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
                 />
               </div>
 
               <div class="space-y-1.5">
-                <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Authorization Key</label>
+                <label class="text-xs font-semibold text-zinc-350 font-push">Upstream Authorization Key</label>
                 <input
                   type="password"
                   v-model="guardsConfig.gatewaySettings.upstreamKey"
                   placeholder="Keep empty to forward client token unchanged"
-                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
+                  class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
                 />
               </div>
 
               <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-1.5">
-                  <label class="text-[10px] font-semibold text-zinc-350 font-push">Max Payload (Bytes)</label>
+                  <label class="text-xs font-semibold text-zinc-350 font-push">Max Payload (Bytes)</label>
                   <input
                     type="number"
                     v-model.number="guardsConfig.gatewaySettings.maxBodyBytes"
-                    class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
+                    class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono"
                   />
                 </div>
                 <div class="space-y-1.5">
-                  <label class="text-[10px] font-semibold text-zinc-350 font-push">Outbound Mode</label>
+                  <label class="text-xs font-semibold text-zinc-350 font-push">Outbound Mode</label>
                   <select
                     v-model="guardsConfig.gatewaySettings.outboundMode"
-                    class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-push"
+                    class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-push"
                   >
                     <option value="off">Off (Passthrough)</option>
                     <option value="buffer">Buffer (Scan Full)</option>
@@ -598,7 +523,7 @@ const copySnippet = () => {
               </div>
             </div>
 
-            <div v-if="syncError" class="text-[9.5px] text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2.5 rounded">
+            <div v-if="syncError" class="text-xs text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2.5 rounded">
               {{ syncError }}
             </div>
           </div>
@@ -607,14 +532,14 @@ const copySnippet = () => {
           <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 text-left space-y-4">
             <div class="flex items-center justify-between">
               <div>
-                <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">Detection Rules</h3>
-                <p class="text-[9.5px] text-zinc-500 leading-normal mt-0.5">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-300 font-push">Detection Rules</h3>
+                <p class="text-xs text-zinc-500 leading-normal mt-0.5">
                   {{ enabledCount }} of {{ detectors.length }} detectors active · toggle them in the Test Zone
                 </p>
               </div>
               <router-link
                 :to="{ name: 'testzone' }"
-                class="text-[10px] font-bold text-zinc-950 bg-zinc-100 hover:bg-white px-3 py-1.5 rounded cursor-pointer transition-all font-push"
+                class="text-xs font-bold text-zinc-950 bg-zinc-100 hover:bg-white px-3 py-1.5 rounded cursor-pointer transition-all font-push"
               >
                 Open Test Zone
               </router-link>
@@ -624,15 +549,15 @@ const copySnippet = () => {
               <span
                 v-for="d in detectors"
                 :key="d.id"
-                class="text-[9px] font-mono px-2 py-1 rounded border inline-flex items-center gap-1.5"
+                class="text-[11px] font-mono px-2.5 py-1 rounded border inline-flex items-center gap-1.5"
                 :class="disabledRules.includes(d.id)
-                  ? 'border-zinc-850 bg-zinc-950/40 text-zinc-600'
+                  ? 'border-zinc-850 bg-zinc-950/40 text-zinc-650'
                   : 'border-emerald-900/30 bg-emerald-950/10 text-emerald-400/90'"
               >
                 <span class="w-1.5 h-1.5 rounded-full" :class="disabledRules.includes(d.id) ? 'bg-zinc-700' : 'bg-emerald-500'"></span>
                 {{ d.name }}
               </span>
-              <span v-if="detectors.length === 0" class="text-[9.5px] text-zinc-600 font-mono">
+              <span v-if="detectors.length === 0" class="text-xs text-zinc-600 font-mono">
                 No detectors loaded - check the admin token.
               </span>
             </div>
@@ -643,10 +568,10 @@ const copySnippet = () => {
 
             <!-- Compiled JSON details -->
             <div class="md:col-span-5 flex flex-col justify-start space-y-3 text-left">
-              <div class="text-xs font-semibold uppercase tracking-wider text-zinc-350 font-push">
+              <div class="text-sm font-semibold uppercase tracking-wider text-zinc-300 font-push">
                 Compiled Configuration
               </div>
-              <div class="cyber-card rounded p-3.5 font-mono text-[9px] text-zinc-400 border border-zinc-900 bg-zinc-950 h-56 overflow-y-auto">
+              <div class="cyber-card rounded p-3.5 font-mono text-xs text-zinc-450 border border-zinc-900 bg-zinc-950 h-56 overflow-y-auto">
                 <pre class="leading-relaxed">{{ compiledJson }}</pre>
               </div>
 
@@ -654,13 +579,13 @@ const copySnippet = () => {
                 <button
                   @click="deployGateway"
                   :disabled="isDeploying"
-                  class="w-full flex items-center justify-center gap-2 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-[10px] py-2.5 px-4 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-push"
+                  class="w-full flex items-center justify-center gap-2 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs py-2.5 px-4 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-push"
                 >
                   <Play class="w-3.5 h-3.5 fill-current" />
                   <span v-if="!isDeploying">Sync Config to Proxy</span>
                   <span v-else>Deploying cluster...</span>
                 </button>
-                <div v-if="justDeployed" class="bg-zinc-900 border border-zinc-850 rounded p-2 text-[9px] text-zinc-450 text-center">
+                <div v-if="justDeployed" class="bg-zinc-900 border border-zinc-850 rounded p-2 text-xs text-zinc-500 text-center">
                   Gateway endpoints successfully updated.
                 </div>
               </div>
@@ -668,12 +593,12 @@ const copySnippet = () => {
 
             <!-- Integration snippets -->
             <div class="md:col-span-7 flex flex-col justify-start space-y-3 text-left">
-              <div class="text-xs font-semibold uppercase tracking-wider text-zinc-350 font-push">
+              <div class="text-sm font-semibold uppercase tracking-wider text-zinc-300 font-push">
                 Integration Hook
               </div>
 
               <!-- Tabs -->
-              <div class="flex border-b border-zinc-900 text-[10px] font-mono">
+              <div class="flex border-b border-zinc-900 text-xs font-mono">
                 <button
                   v-for="tab in (['js', 'python', 'curl'] as const)"
                   :key="tab"
@@ -696,7 +621,7 @@ const copySnippet = () => {
                   <Copy v-else class="w-3 h-3" />
                 </button>
 
-                <div class="cyber-card rounded p-3.5 font-mono text-[9px] text-zinc-450 bg-zinc-950 border border-zinc-800 text-left overflow-x-auto h-full overflow-y-auto">
+                <div class="cyber-card rounded p-3.5 font-mono text-xs text-zinc-450 bg-zinc-950 border border-zinc-800 text-left overflow-x-auto h-full overflow-y-auto">
                   <pre class="leading-relaxed">{{ codeSnippets[activeTab] }}</pre>
                 </div>
               </div>
