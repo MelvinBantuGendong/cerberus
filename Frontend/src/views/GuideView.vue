@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   User,
@@ -12,6 +12,7 @@ import {
 } from '@lucide/vue'
 
 const router = useRouter()
+const activeRoute = computed(() => router.currentRoute.value.name)
 
 const handleLogout = () => {
   localStorage.removeItem('cerberus_auth')
@@ -139,14 +140,15 @@ const copy = (text: string, key: string) => {
 
     <aside class="w-64 border-r border-zinc-900 bg-zinc-900/20 backdrop-blur-md flex flex-col justify-between z-10 shrink-0">
       <div>
-        <div class="h-16 flex items-center gap-3 px-6 border-b border-zinc-900">
-          <span class="font-bold tracking-wider text-xs text-white font-push">Cerberus</span>
+        <div class="h-16 flex items-center gap-2 px-6 border-b border-zinc-900">
+          <span class="font-black tracking-widest text-sm text-white uppercase font-push">Cerberus</span>
         </div>
 
         <nav class="p-4 space-y-1">
           <router-link
             :to="{ name: 'guide' }"
-            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold bg-zinc-900 text-white border border-zinc-800"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold border transition-all"
+            :class="activeRoute === 'guide' ? 'border-rose-900/60 bg-rose-950/10 text-rose-455' : 'border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-white'"
           >
             <BookOpen class="w-3.5 h-3.5" />
             Quick Start
@@ -154,7 +156,8 @@ const copy = (text: string, key: string) => {
 
           <router-link
             :to="{ name: 'builder' }"
-            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold border transition-all"
+            :class="activeRoute === 'builder' ? 'border-rose-900/60 bg-rose-950/10 text-rose-455' : 'border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-white'"
           >
             <Sliders class="w-3.5 h-3.5" />
             Manage Proxy
@@ -162,7 +165,8 @@ const copy = (text: string, key: string) => {
 
           <router-link
             :to="{ name: 'testzone' }"
-            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold border transition-all"
+            :class="activeRoute === 'testzone' ? 'border-rose-900/60 bg-rose-950/10 text-rose-455' : 'border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-white'"
           >
             <Bug class="w-3.5 h-3.5" />
             Rule Set & Playground
@@ -194,7 +198,7 @@ const copy = (text: string, key: string) => {
         <!-- Mental model -->
         <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 space-y-2">
           <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">How config works</h3>
-          <p class="text-[11px] text-zinc-400 leading-relaxed">
+          <p class="text-xs text-zinc-400 leading-relaxed">
             The gateway reads these from the <span class="text-zinc-200">environment</span>. Env is the boot seed,
             once <code class="text-zinc-300">CERBERUS_STATE_PATH</code> is set, the saved store becomes the source of
             truth and you change settings live from <span class="text-zinc-200">Manage Proxy</span> - no restart. Only
@@ -207,10 +211,10 @@ const copy = (text: string, key: string) => {
           <div class="flex items-baseline gap-3">
             <h3 class="text-sm font-bold text-white font-push">{{ g.title }}</h3>
             <span
-              class="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border"
+              class="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border"
               :class="tierMeta[g.tier].cls"
             >{{ tierMeta[g.tier].label }}</span>
-            <span class="text-[10px] text-zinc-500">{{ g.blurb }}</span>
+            <span class="text-xs text-zinc-500">{{ g.blurb }}</span>
           </div>
 
           <div class="space-y-2.5">
@@ -220,15 +224,15 @@ const copy = (text: string, key: string) => {
               class="cyber-card rounded p-4 border border-zinc-900 bg-zinc-950/20 space-y-2"
             >
               <div class="flex items-center justify-between gap-3 flex-wrap">
-                <code class="text-[11px] font-mono font-bold text-zinc-100">{{ v.name }}</code>
+                <code class="text-xs font-mono font-bold text-zinc-100">{{ v.name }}</code>
                 <div class="flex items-center gap-2">
-                  <span class="text-[9px] text-zinc-600 font-mono">default: {{ v.fallback }}</span>
+                  <span class="text-[10px] text-zinc-650 font-mono">default: {{ v.fallback }}</span>
                 </div>
               </div>
-              <p class="text-[10px] text-zinc-500 leading-relaxed">{{ v.purpose }}</p>
+              <p class="text-xs text-zinc-450 leading-relaxed">{{ v.purpose }}</p>
               <div class="flex items-center gap-2 bg-zinc-950 border border-zinc-900 rounded px-2.5 py-1.5">
-                <span class="text-[8px] text-zinc-600 uppercase font-push tracking-wider shrink-0">Example</span>
-                <code class="text-[10px] font-mono text-emerald-400/90 truncate">{{ v.example }}</code>
+                <span class="text-[10px] text-zinc-600 uppercase font-push tracking-wider shrink-0">Example</span>
+                <code class="text-xs font-mono text-emerald-400/90 truncate">{{ v.example }}</code>
                 <button
                   @click="copy(v.name + '=' + v.example, v.name)"
                   class="ml-auto text-zinc-600 hover:text-white p-0.5 rounded transition-colors shrink-0 cursor-pointer"
@@ -238,7 +242,7 @@ const copy = (text: string, key: string) => {
                   <Copy v-else class="w-3 h-3" />
                 </button>
               </div>
-              <p v-if="v.note" class="text-[9.5px] text-amber-500/80 leading-relaxed">{{ v.note }}</p>
+              <p v-if="v.note" class="text-xs text-amber-500/80 leading-relaxed">{{ v.note }}</p>
             </div>
           </div>
         </div>
@@ -246,12 +250,12 @@ const copy = (text: string, key: string) => {
         <!-- Run it -->
         <div class="space-y-3">
           <h3 class="text-sm font-bold text-white font-push">Run the gateway</h3>
-          <p class="text-[10px] text-zinc-500 leading-relaxed">
+          <p class="text-xs text-zinc-500 leading-relaxed">
             The gateway reads real environment variables, so load your <code class="text-zinc-400">.env</code> into the
             shell first. Pick your shell:
           </p>
 
-          <div class="flex border-b border-zinc-900 text-[10px] font-mono">
+          <div class="flex border-b border-zinc-900 text-xs font-mono">
             <button
               v-for="tab in (['bash', 'powershell', 'cmd'] as const)"
               :key="tab"
@@ -272,7 +276,7 @@ const copy = (text: string, key: string) => {
               <Check v-if="copiedKey === 'run'" class="w-3 h-3 text-emerald-400" />
               <Copy v-else class="w-3 h-3" />
             </button>
-            <div class="cyber-card rounded p-4 font-mono text-[10px] text-zinc-400 bg-zinc-950 border border-zinc-900 overflow-x-auto">
+            <div class="cyber-card rounded p-4 font-mono text-xs text-zinc-400 bg-zinc-950 border border-zinc-900 overflow-x-auto">
               <pre class="leading-relaxed">{{ runTabs[activeTab] }}</pre>
             </div>
           </div>
@@ -281,9 +285,9 @@ const copy = (text: string, key: string) => {
         <!-- Next steps -->
         <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 space-y-3">
           <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">Then what</h3>
-          <ol class="space-y-2 text-[10px] text-zinc-400 leading-relaxed list-decimal list-inside">
+          <ol class="space-y-2 text-xs text-zinc-400 leading-relaxed list-decimal list-inside">
             <li>Open <router-link :to="{ name: 'builder' }" class="text-zinc-200 underline hover:text-white">Manage Proxy</router-link>, paste your admin token, and confirm settings sync (upstream_key shows as set).</li>
-            <li>Use the <router-link :to="{ name: 'testzone' }" class="text-zinc-200 underline hover:text-white">Test Zone</router-link> to fire attack presets and watch verdicts - toggle detectors on and off live.</li>
+            <li>Use the <router-link :to="{ name: 'testzone' }" class="text-zinc-200 underline hover:text-white">Rule Set & Playground</router-link> to fire attack presets and watch verdicts - toggle detectors on and off live.</li>
             <li>To use it as a real proxy, generate a client key on Manage Proxy, then point your app's base URL at <code class="text-zinc-300">http://localhost:8080/v1</code> with that key.</li>
           </ol>
         </div>

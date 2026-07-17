@@ -251,14 +251,15 @@ onMounted(loadCatalog)
     <!-- Navigation Sidebar -->
     <aside class="w-64 border-r border-zinc-900 bg-zinc-900/20 backdrop-blur-md flex flex-col justify-between z-10 shrink-0">
       <div>
-        <div class="h-16 flex items-center gap-3 px-6 border-b border-zinc-900">
-          <span class="font-bold tracking-wider text-xs text-white font-push">Cerberus</span>
+        <div class="h-16 flex items-center gap-2 px-6 border-b border-zinc-900">
+          <span class="font-black tracking-widest text-sm text-white uppercase font-push">Cerberus</span>
         </div>
 
         <nav class="p-4 space-y-1">
           <router-link
             :to="{ name: 'guide' }"
-            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold border transition-all"
+            :class="activeRoute === 'guide' ? 'border-rose-900/60 bg-rose-950/10 text-rose-455' : 'border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-white'"
           >
             <BookOpen class="w-3.5 h-3.5" />
             Quick Start

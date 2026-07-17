@@ -352,8 +352,8 @@ const copySnippet = () => {
     <aside class="w-64 border-r border-zinc-900 bg-zinc-900/20 backdrop-blur-md flex flex-col justify-between z-10">
       <div>
         <!-- Brand Header -->
-        <div class="h-16 flex items-center gap-3 px-6 border-b border-zinc-900">
-          <span class="font-bold tracking-wider text-xs text-white font-push">Cerberus</span>
+        <div class="h-16 flex items-center gap-2 px-6 border-b border-zinc-900">
+          <span class="font-black tracking-widest text-sm text-white uppercase font-push">Cerberus</span>
         </div>
 
         <!-- Navigation Links -->
