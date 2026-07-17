@@ -8,6 +8,8 @@
 @layer base {
   body {
     background-color: #09090b; /* zinc-950 */
+    background-image: radial-gradient(circle at 80% 20%, rgba(244, 63, 94, 0.035), transparent 700px),
+                      radial-gradient(circle at 10% 80%, rgba(244, 63, 94, 0.015), transparent 900px);
     color: #fafafa; /* zinc-50 */
     font-family: 'Fira Code', monospace;
     overflow-x: hidden;

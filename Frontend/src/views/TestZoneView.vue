@@ -13,6 +13,7 @@ import {
 } from '@lucide/vue'
 
 const router = useRouter()
+const activeRoute = computed(() => router.currentRoute.value.name)
 
 const handleLogout = () => {
   localStorage.removeItem('cerberus_auth')
@@ -216,7 +217,8 @@ onMounted(loadCatalog)
         <nav class="p-4 space-y-1">
           <router-link
             :to="{ name: 'builder' }"
-            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold border transition-all"
+            :class="activeRoute === 'builder' ? 'border-rose-900/60 bg-rose-950/10 text-rose-455' : 'border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-white'"
           >
             <Sliders class="w-3.5 h-3.5" />
             Manage Proxy
@@ -224,7 +226,8 @@ onMounted(loadCatalog)
 
           <router-link
             :to="{ name: 'testzone' }"
-            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold bg-zinc-900 text-white border border-zinc-800"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold border transition-all"
+            :class="activeRoute === 'testzone' ? 'border-rose-900/60 bg-rose-950/10 text-rose-455' : 'border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-white'"
           >
             <Bug class="w-3.5 h-3.5" />
             Test Zone
@@ -273,7 +276,7 @@ onMounted(loadCatalog)
               />
               <button
                 @click="loadCatalog"
-                class="text-xs font-bold text-zinc-950 bg-zinc-100 hover:bg-white px-3 py-1.5 rounded cursor-pointer transition-all font-push"
+                class="text-xs font-bold text-rose-455 border border-rose-900/40 bg-rose-950/10 hover:bg-rose-900/25 hover:text-rose-200 px-3 py-1.5 rounded cursor-pointer transition-all font-push"
               >
                 Load
               </button>
@@ -393,7 +396,7 @@ onMounted(loadCatalog)
             <button
               @click="sendAttack"
               :disabled="sending || !promptText.trim()"
-              class="w-full flex items-center justify-center gap-2 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs py-2.5 px-4 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-push"
+              class="w-full flex items-center justify-center gap-2 border border-rose-900/60 bg-rose-950/15 text-rose-455 hover:bg-rose-900/30 hover:text-rose-200 font-bold text-xs py-2.5 px-4 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-push"
             >
               <Play class="w-3.5 h-3.5 fill-current" />
               <span v-if="!sending">Send Through Proxy</span>
