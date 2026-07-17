@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   Shield,
   ArrowRight,
+  BookOpen,
 } from '@lucide/vue'
 
 const router = useRouter()
@@ -255,6 +256,14 @@ onMounted(loadCatalog)
         </div>
 
         <nav class="p-4 space-y-1">
+          <router-link
+            :to="{ name: 'guide' }"
+            class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
+          >
+            <BookOpen class="w-3.5 h-3.5" />
+            Quick Start
+          </router-link>
+
           <router-link
             :to="{ name: 'builder' }"
             class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold border transition-all"

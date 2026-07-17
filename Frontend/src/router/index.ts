@@ -1,14 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import BuilderView from '../views/BuilderView.vue'
-import AnalyticsView from '../views/AnalyticsView.vue'
 import TestZoneView from '../views/TestZoneView.vue'
+import GuideView from '../views/GuideView.vue'
 
 const routes = [
   {
     path: '/',
     name: 'login',
     component: LoginView,
+  },
+  {
+    path: '/guide',
+    name: 'guide',
+    component: GuideView,
   },
   {
     path: '/builder',
@@ -19,11 +24,6 @@ const routes = [
     path: '/test-zone',
     name: 'testzone',
     component: TestZoneView,
-  },
-  {
-    path: '/analytics',
-    name: 'analytics',
-    component: AnalyticsView,
   },
 ]
 
