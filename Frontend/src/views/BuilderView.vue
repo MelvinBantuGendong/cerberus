@@ -31,6 +31,16 @@ const generatedKeyLabel = ref('')
 const copiedGeneratedKey = ref(false)
 const keyGenError = ref('')
 
+const showDeleteModal = ref(false)
+const keyToDeleteId = ref('')
+const keyToDeleteLabel = ref('')
+
+const confirmDeleteApiKey = (key: { id: string; label: string }) => {
+  keyToDeleteId.value = key.id
+  keyToDeleteLabel.value = key.label
+  showDeleteModal.value = true
+}
+
 const copyGeneratedKey = () => {
   navigator.clipboard.writeText(generatedKey.value)
   copiedGeneratedKey.value = true
@@ -207,11 +217,10 @@ const generateNewKey = async () => {
   }
 }
 
-const deleteApiKey = async (id: string) => {
-  if (!adminToken.value) return
-  if (!confirm('Are you sure you want to revoke this client API key?')) return
+const executeDeleteApiKey = async () => {
+  if (!adminToken.value || !keyToDeleteId.value) return
   try {
-    const res = await fetch(`/admin/keys/${id}`, {
+    const res = await fetch(`/admin/keys/${keyToDeleteId.value}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${adminToken.value}`
@@ -222,6 +231,10 @@ const deleteApiKey = async (id: string) => {
     }
   } catch (err) {
     console.error('Failed to delete key:', err)
+  } finally {
+    showDeleteModal.value = false
+    keyToDeleteId.value = ''
+    keyToDeleteLabel.value = ''
   }
 }
 
@@ -361,8 +374,6 @@ const copySnippet = () => {
             <Bug class="w-3.5 h-3.5" />
             Test Zone
           </router-link>
-
-
         </nav>
       </div>
 
@@ -464,7 +475,7 @@ const copySnippet = () => {
                   <span class="text-zinc-600 block text-[10px] mt-0.5 font-mono">ID: {{ key.id }}</span>
                 </div>
                 <button
-                  @click="deleteApiKey(key.id)"
+                  @click="confirmDeleteApiKey(key)"
                   class="text-zinc-600 hover:text-red-400 p-1 rounded hover:bg-zinc-900/60 transition-colors cursor-pointer shrink-0"
                   title="Revoke Key"
                 >
@@ -560,14 +571,14 @@ const copySnippet = () => {
               <div>
                 <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-300 font-push">Detection Rules</h3>
                 <p class="text-xs text-zinc-500 leading-normal mt-0.5">
-                  {{ enabledCount }} of {{ detectors.length }} detectors active · toggle them in the Test Zone
+                  {{ enabledCount }} of {{ detectors.length }} detectors active · toggle them in the Playground
                 </p>
               </div>
               <router-link
                 :to="{ name: 'testzone' }"
                 class="text-xs font-bold text-rose-455 border border-rose-900/40 bg-rose-950/10 hover:bg-rose-900/25 hover:text-rose-200 px-3 py-1.5 rounded cursor-pointer transition-all font-push"
               >
-                Open Test Zone
+                Open Rule Set & Playground
               </router-link>
             </div>
 
@@ -705,6 +716,48 @@ const copySnippet = () => {
         >
           I have saved this key
         </button>
+      </div>
+    </div>
+
+    <!-- API Key Revocation Modal Overlay -->
+    <div 
+      v-if="showDeleteModal" 
+      class="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <div 
+        class="cyber-card rounded p-6 border border-zinc-800 bg-zinc-900 max-w-sm w-full space-y-5 text-left shadow-2xl relative"
+      >
+        <div class="space-y-1">
+          <h3 class="text-sm font-bold text-white font-push uppercase tracking-wider">Revoke API Key</h3>
+          <p class="text-xs text-zinc-500">Are you sure you want to permanently disable this key?</p>
+        </div>
+
+        <div class="space-y-1">
+          <span class="text-[10px] text-zinc-450 uppercase font-mono tracking-wider font-semibold">Key Details</span>
+          <div class="text-xs text-zinc-350 bg-zinc-950 border border-zinc-950 p-3 rounded font-mono truncate">
+            <span class="text-zinc-300 block font-sans font-bold leading-normal truncate">{{ keyToDeleteLabel }}</span>
+            <span class="text-zinc-600 block text-[10px] mt-0.5 font-mono">ID: {{ keyToDeleteId }}</span>
+          </div>
+        </div>
+
+        <div class="bg-red-950/10 border border-red-900/30 rounded p-3 text-[10px] text-red-500 font-mono leading-relaxed">
+          CRITICAL: Applications using this client token will instantly lose proxy access and be blocked at ingress sentry.
+        </div>
+
+        <div class="flex gap-3">
+          <button 
+            @click="showDeleteModal = false"
+            class="flex-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 font-bold text-xs py-2.5 rounded transition-all duration-150 cursor-pointer font-push text-center"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="executeDeleteApiKey"
+            class="flex-1 border border-red-900/60 bg-red-950/15 text-red-400 hover:bg-red-900/30 hover:text-red-200 font-bold text-xs py-2.5 rounded transition-all duration-150 cursor-pointer font-push text-center"
+          >
+            Yes, Revoke Key
+          </button>
+        </div>
       </div>
     </div>
   </div>

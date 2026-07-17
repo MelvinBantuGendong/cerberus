@@ -150,7 +150,7 @@ onUnmounted(() => {
             class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-zinc-400 hover:bg-zinc-900/60 hover:text-white transition-colors"
           >
             <Bug class="w-3.5 h-3.5" />
-            Test Zone
+            Rule Set & Playground
           </router-link>
 
           <router-link

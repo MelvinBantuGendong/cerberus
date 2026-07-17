@@ -232,8 +232,6 @@ onMounted(loadCatalog)
             <Bug class="w-3.5 h-3.5" />
             Test Zone
           </router-link>
-
-
         </nav>
       </div>
 
