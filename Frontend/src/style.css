@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Fira Code', monospace;
+  --font-display: 'Cascadia Code', monospace;
+}
+
+@layer base {
+  body {
+    background-color: #09090b; /* zinc-950 */
+    color: #fafafa; /* zinc-50 */
+    font-family: 'Fira Code', monospace;
+    overflow-x: hidden;
+  }
+
+  /* Minimal Scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #09090b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46;
+  }
+}
+
+/* Minimal card utility - flat with subtle border */
+.cyber-card {
+  background: #121214;
+  border: 1px solid #27272a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cyber-card:hover {
+  border-color: #3f3f46;
+}
+
+/* Simple minimal dashed patterns if needed */
+.minimal-dashed {
+  background-image: radial-gradient(circle, #27272a 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.font-push {
+  font-family: 'Cascadia Code', monospace;
+}
