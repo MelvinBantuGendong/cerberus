@@ -2,8 +2,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
-  Shield, 
-  Settings, 
   Play, 
   Copy, 
   Check,
@@ -11,12 +9,8 @@ import {
   User,
   LogOut,
   Sliders,
-  GripVertical,
-  Plus,
   Trash2
 } from '@lucide/vue'
-import Slider from 'primevue/slider'
-import InputText from 'primevue/inputtext'
 
 const router = useRouter()
 
@@ -44,29 +38,18 @@ interface Project {
 
 const projects = ref<Project[]>([
   {
-    id: 'shield_a8b92c',
-    name: 'Website Chatbot',
-    proxyUrl: 'https://api.cerberus.sh/v1/proxy/shield_a8b92c',
+    id: 'gateway_cluster',
+    name: 'Go Gateway Core',
+    proxyUrl: 'http://localhost:8080/v1/chat/completions',
     status: 'active',
-    activeGuardsCount: 2
-  },
-  {
-    id: 'shield_df47x1',
-    name: 'Slack Support Agent',
-    proxyUrl: 'https://api.cerberus.sh/v1/proxy/shield_df47x1',
-    status: 'active',
-    activeGuardsCount: 3
-  },
-  {
-    id: 'shield_9281ab',
-    name: 'Internal Data SQL Bot',
-    proxyUrl: 'https://api.cerberus.sh/v1/proxy/shield_9281ab',
-    status: 'inactive',
-    activeGuardsCount: 1
+    activeGuardsCount: 4
   }
 ])
 
-const activeProjectId = ref('shield_a8b92c')
+const activeProjectId = ref('gateway_cluster')
+const activeProject = computed(() => {
+  return projects.value.find(p => p.id === activeProjectId.value) || projects.value[0]
+})
 const copiedUrl = ref('')
 
 const copyProjectUrl = (url: string) => {
@@ -77,47 +60,11 @@ const copyProjectUrl = (url: string) => {
   }, 2000)
 }
 
-const createNewProject = () => {
-  const names = ['E-Commerce Conversationalist', 'HR Automation Sentry', 'Logistics Routing Node', 'Marketing Copilot Core']
-  const randomName = names[Math.floor(Math.random() * names.length)] + ' #' + Math.floor(Math.random() * 900 + 100)
-  const id = 'shield_' + Math.random().toString(36).substring(2, 8)
-  const newProj = {
-    id,
-    name: randomName,
-    proxyUrl: `https://api.cerberus.sh/v1/proxy/${id}`,
-    status: 'active' as const,
-    activeGuardsCount: 1
-  }
-  projects.value.push(newProj)
-  selectProject(newProj)
-}
+
 
 const selectProject = (project: Project) => {
   activeProjectId.value = project.id
   shieldId.value = project.id
-  
-  // Dynamically configure nodes to represent loading project configs
-  if (project.name.includes('Chatbot')) {
-    nodes.value.promptInjection.active = true
-    nodes.value.toolFirewall.active = false
-    nodes.value.piiMasker.active = true
-    nodes.value.rateLimiter.active = false
-  } else if (project.name.includes('Slack') || project.name.includes('Automation')) {
-    nodes.value.promptInjection.active = true
-    nodes.value.toolFirewall.active = true
-    nodes.value.piiMasker.active = false
-    nodes.value.rateLimiter.active = true
-  } else if (project.name.includes('SQL') || project.name.includes('Routing')) {
-    nodes.value.promptInjection.active = true
-    nodes.value.toolFirewall.active = true
-    nodes.value.piiMasker.active = true
-    nodes.value.rateLimiter.active = false
-  } else {
-    nodes.value.promptInjection.active = true
-    nodes.value.toolFirewall.active = false
-    nodes.value.piiMasker.active = false
-    nodes.value.rateLimiter.active = false
-  }
 }
 
 // Pipeline Guardrails Configurations
@@ -126,346 +73,45 @@ const guardsConfig = ref({
     name: 'Ingress Sentry (Left Head)',
     description: 'Blocks adversarial text payloads',
     similarityThreshold: 75,
-    customPatterns: 'ignore previous, act as developer, system override',
+    customPatterns: '',
     threatAction: 'BLOCK_CONNECTION'
   },
   toolFirewall: {
     name: 'Runtime Firewall (Middle Head)',
     description: 'Blocks hazardous system calls',
-    commandBlacklist: 'rm -rf, DROP TABLE, rm -d, mkfs, format',
+    commandBlacklist: '',
     alertSeverity: 'CRITICAL'
   },
   piiMasker: {
     name: 'Egress Censor (Right Head) - PII',
     description: 'Redacts outgoing sensitive variables',
     maskString: '[REDACTED_SECURE]',
-    maskTypes: ['API Keys', 'Emails', 'Credit Cards'],
+    maskTypes: [] as string[],
     threatAction: 'REDACT'
   },
   rateLimiter: {
     name: 'Egress Censor (Right Head) - Governor',
     description: 'Enforces hard ceilings and token limits',
-    maxTokensPerMinute: 15000,
-    costCeilingPerDay: 5.0
+    maxTokensPerMinute: 0,
+    costCeilingPerDay: 0.0
   },
   gatewaySettings: {
     name: 'Gateway Core Config',
     description: 'Binds parameters directly to the active Go backend proxy',
-    upstream: 'https://openrouter.ai/api/v1',
+    upstream: '',
     upstreamKey: '',
-    maxBodyBytes: 4194304,
-    outboundMode: 'buffer'
+    maxBodyBytes: 0,
+    outboundMode: 'off'
   }
 })
 
-// Dynamic Tag Rules builders
-const newToolTag = ref('')
-const toolFirewallTags = ref(['rm -rf', 'DROP TABLE', 'rm -d', 'mkfs', 'format'])
-
-const addToolFirewallTag = () => {
-  const cleanVal = newToolTag.value.trim().replace(/,/g, '')
-  if (cleanVal && !toolFirewallTags.value.includes(cleanVal)) {
-    toolFirewallTags.value.push(cleanVal)
-  }
-  newToolTag.value = ''
-  guardsConfig.value.toolFirewall.commandBlacklist = toolFirewallTags.value.join(', ')
-}
-
-const removeToolFirewallTag = (idx: number) => {
-  toolFirewallTags.value.splice(idx, 1)
-  guardsConfig.value.toolFirewall.commandBlacklist = toolFirewallTags.value.join(', ')
-}
-
-const handleToolTagBackspace = () => {
-  if (newToolTag.value === '' && toolFirewallTags.value.length > 0) {
-    toolFirewallTags.value.pop()
-    guardsConfig.value.toolFirewall.commandBlacklist = toolFirewallTags.value.join(', ')
-  }
-}
-
-// Ingress Sentry Blacklist Tag Builders
-const newPatternTag = ref('')
-const promptInjectionTags = ref(['ignore previous', 'act as developer', 'system override'])
-
-const addPatternTag = () => {
-  const cleanVal = newPatternTag.value.trim().replace(/,/g, '')
-  if (cleanVal && !promptInjectionTags.value.includes(cleanVal)) {
-    promptInjectionTags.value.push(cleanVal)
-  }
-  newPatternTag.value = ''
-  guardsConfig.value.promptInjection.customPatterns = promptInjectionTags.value.join(', ')
-}
-
-const removePatternTag = (idx: number) => {
-  promptInjectionTags.value.splice(idx, 1)
-  guardsConfig.value.promptInjection.customPatterns = promptInjectionTags.value.join(', ')
-}
-
-const handlePatternTagBackspace = () => {
-  if (newPatternTag.value === '' && promptInjectionTags.value.length > 0) {
-    promptInjectionTags.value.pop()
-    guardsConfig.value.promptInjection.customPatterns = promptInjectionTags.value.join(', ')
-  }
-}
-
-// Security Strictness levels linked to math threshold parameters
-const strictnessLevel = computed({
-  get() {
-    const score = guardsConfig.value.promptInjection.similarityThreshold
-    if (score <= 60) return 'low'
-    if (score <= 85) return 'medium'
-    return 'high'
-  },
-  set(val: 'low' | 'medium' | 'high') {
-    if (val === 'low') {
-      guardsConfig.value.promptInjection.similarityThreshold = 55
-      guardsConfig.value.promptInjection.threatAction = 'ALERT_ONLY'
-    } else if (val === 'medium') {
-      guardsConfig.value.promptInjection.similarityThreshold = 75
-      guardsConfig.value.promptInjection.threatAction = 'BLOCK_CONNECTION'
-    } else {
-      guardsConfig.value.promptInjection.similarityThreshold = 90
-      guardsConfig.value.promptInjection.threatAction = 'BLOCK_CONNECTION'
-    }
-  }
-})
-
-type GuardKey = 'promptInjection' | 'toolFirewall' | 'piiMasker' | 'rateLimiter' | 'gatewaySettings';
-const selectedGuardKey = ref<GuardKey>('promptInjection')
-
-// 2D Node Sandbox Definitions
-interface SandboxNode {
-  key: string
-  name: string
-  type: 'input' | 'output' | 'guard'
-  description: string
-  x: number
-  y: number
-  active: boolean
-}
-
-const nodes = ref<Record<string, SandboxNode>>({
-  input: {
-    key: 'input',
-    name: 'Agent Request Init',
-    type: 'input',
-    description: 'Entry endpoint for agent prompts',
-    x: 30,
-    y: 180,
-    active: true
-  },
-  promptInjection: {
-    key: 'promptInjection',
-    name: 'Ingress Sentry (Left Head)',
-    type: 'guard',
-    description: 'Blocks adversarial text payloads',
-    x: 270,
-    y: 50,
-    active: true
-  },
-  toolFirewall: {
-    key: 'toolFirewall',
-    name: 'Runtime Firewall (Middle Head)',
-    type: 'guard',
-    description: 'Blocks hazardous system calls',
-    x: 270,
-    y: 280,
-    active: true
-  },
-  piiMasker: {
-    key: 'piiMasker',
-    name: 'Egress Censor (Right Head) - PII',
-    type: 'guard',
-    description: 'Redacts outgoing sensitive variables',
-    x: 520,
-    y: 50,
-    active: false
-  },
-  rateLimiter: {
-    key: 'rateLimiter',
-    name: 'Egress Censor (Right Head) - Governor',
-    type: 'guard',
-    description: 'Enforces token speed thresholds',
-    x: 520,
-    y: 280,
-    active: false
-  },
-  output: {
-    key: 'output',
-    name: 'Target AI Service',
-    type: 'output',
-    description: 'Forwarding endpoint for verified logs',
-    x: 770,
-    y: 180,
-    active: true
-  }
-})
-
-// Node Drag & Drop Sandbox Engine
-const draggingNodeKey = ref<string | null>(null)
-const mouseOffset = ref({ x: 0, y: 0 })
-const draggedSidebarItem = ref<GuardKey | null>(null)
-
-const startNodeDrag = (e: MouseEvent, key: string) => {
-  e.preventDefault()
-  draggingNodeKey.value = key
-  const node = nodes.value[key]
-  mouseOffset.value = {
-    x: e.clientX - node.x,
-    y: e.clientY - node.y
-  }
-}
-
-const onCanvasMouseMove = (e: MouseEvent) => {
-  if (!draggingNodeKey.value) return
-  const key = draggingNodeKey.value
-  const node = nodes.value[key]
-  
-  let newX = e.clientX - mouseOffset.value.x
-  let newY = e.clientY - mouseOffset.value.y
-  
-  // Keep nodes within the sandbox boundaries
-  newX = Math.max(10, Math.min(800, newX))
-  newY = Math.max(10, Math.min(370, newY))
-  
-  node.x = newX
-  node.y = newY
-}
-
-const stopNodeDrag = () => {
-  draggingNodeKey.value = null
-}
-
-// Sidebar Drag and Drop handlers
-const handleSidebarDragStart = (key: GuardKey) => {
-  draggedSidebarItem.value = key
-}
-
-const handleSidebarDragEnd = () => {
-  draggedSidebarItem.value = null
-}
-
-const handleCanvasDrop = (e: DragEvent) => {
-  if (!draggedSidebarItem.value) return
-  
-  const key = draggedSidebarItem.value
-  const canvas = e.currentTarget as HTMLElement
-  const rect = canvas.getBoundingClientRect()
-  
-  let dropX = e.clientX - rect.left - 100 // Center offset (half of card width 200px)
-  let dropY = e.clientY - rect.top - 40  // Center offset (half of card height 80px)
-  
-  dropX = Math.max(10, Math.min(800, dropX))
-  dropY = Math.max(10, Math.min(370, dropY))
-  
-  nodes.value[key].active = true
-  nodes.value[key].x = dropX
-  nodes.value[key].y = dropY
-  
-  selectedGuardKey.value = key
-  draggedSidebarItem.value = null
-  
-  // Sync active project counters
-  syncProjectGuardsCount()
-}
-
-// Click triggers for accessibility
-const activateNode = (key: GuardKey) => {
-  nodes.value[key].active = true
-  nodes.value[key].x = 400
-  nodes.value[key].y = 150
-  selectedGuardKey.value = key
-  syncProjectGuardsCount()
-}
-
-const deactivateNode = (key: GuardKey) => {
-  nodes.value[key].active = false
-  syncProjectGuardsCount()
-}
-
-const syncProjectGuardsCount = () => {
-  const current = projects.value.find(p => p.id === activeProjectId.value)
-  if (current) {
-    current.activeGuardsCount = Object.values(nodes.value).filter(n => n.active && n.type === 'guard').length
-  }
-}
-
-// Compute connection paths dynamically based on horizontal sorted coordinates
-const connectionPaths = computed(() => {
-  const activeNodes = Object.values(nodes.value).filter(n => n.active)
-  activeNodes.sort((a, b) => a.x - b.x)
-  
-  const paths: string[] = []
-  for (let i = 0; i < activeNodes.length - 1; i++) {
-    const nodeA = activeNodes[i]
-    const nodeB = activeNodes[i + 1]
-    
-    // Output center point of Node A (right edge)
-    const x1 = nodeA.x + 200
-    const y1 = nodeA.y + 40
-    
-    // Input center point of Node B (left edge)
-    const x2 = nodeB.x
-    const y2 = nodeB.y + 40
-    
-    // Bezier control points
-    const cp1x = x1 + (x2 - x1) / 2
-    const cp1y = y1
-    const cp2x = x1 + (x2 - x1) / 2
-    const cp2y = y2
-    
-    paths.push(`M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`)
-  }
-  return paths
-})
-
-// Computed Configuration JSON (ordered dynamically by X coordinate)
 const compiledJson = computed(() => {
-  const activeGuards: Record<string, any> = {}
-  
-  const sortedActiveGuards = Object.values(nodes.value)
-    .filter(n => n.active && n.type === 'guard')
-    .sort((a, b) => a.x - b.x)
-    
-  sortedActiveGuards.forEach(node => {
-    const key = node.key
-    if (key === 'promptInjection') {
-      activeGuards.prompt_injection_detector = {
-        action: guardsConfig.value.promptInjection.threatAction,
-        strictness_profile: strictnessLevel.value.toUpperCase(),
-        sensitivity_threshold: guardsConfig.value.promptInjection.similarityThreshold / 100,
-        blacklist_phrases: promptInjectionTags.value
-      }
-    }
-    if (key === 'toolFirewall') {
-      activeGuards.tool_execution_firewall = {
-        severity: guardsConfig.value.toolFirewall.alertSeverity,
-        blocked_signatures: toolFirewallTags.value
-      }
-    }
-    if (key === 'piiMasker') {
-      activeGuards.pii_redactor = {
-        action: guardsConfig.value.piiMasker.threatAction,
-        redaction_token: guardsConfig.value.piiMasker.maskString,
-        entities: guardsConfig.value.piiMasker.maskTypes
-      }
-    }
-    if (key === 'rateLimiter') {
-      activeGuards.budget_governor = {
-        max_tokens_tpm: guardsConfig.value.rateLimiter.maxTokensPerMinute,
-        max_cost_usd_daily: guardsConfig.value.rateLimiter.costCeilingPerDay
-      }
-    }
-  })
-
   return JSON.stringify({
-    shield_id: shieldId.value,
-    version: '1.0.0',
-    meta: {
-      client: 'cerberus-dashboard',
-      updated_at: new Date().toISOString()
-    },
-    pipeline: activeGuards
+    upstream: guardsConfig.value.gatewaySettings.upstream || null,
+    max_body_bytes: Number(guardsConfig.value.gatewaySettings.maxBodyBytes) || 0,
+    outbound_mode: guardsConfig.value.gatewaySettings.outboundMode || 'off',
+    admin_token_configured: !!adminToken.value,
+    client_auth_keys_count: apiKeys.value.length
   }, null, 2)
 })
 
@@ -671,10 +317,7 @@ const copySnippet = () => {
       <div>
         <!-- Brand Header -->
         <div class="h-16 flex items-center gap-3 px-6 border-b border-zinc-900">
-          <div class="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-            <Shield class="w-4 h-4 text-zinc-300" />
-          </div>
-          <span class="font-bold tracking-wider text-sm text-white font-push">CERBERUS</span>
+          <span class="font-bold tracking-wider text-xs text-white font-push">Cerberus</span>
         </div>
 
         <!-- Navigation Links -->
@@ -684,7 +327,7 @@ const copySnippet = () => {
             class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold bg-zinc-900 text-white border border-zinc-800"
           >
             <Sliders class="w-3.5 h-3.5" />
-            Pipeline Builder
+            Manage Proxy
           </router-link>
           
           <router-link 
@@ -706,7 +349,6 @@ const copySnippet = () => {
           </div>
           <div class="text-left">
             <p class="text-xs font-semibold text-zinc-300">dev_mode</p>
-            <p class="text-[9px] text-zinc-550">Verified Session</p>
           </div>
           <button 
             @click="handleLogout" 
@@ -725,32 +367,19 @@ const copySnippet = () => {
       <!-- Top Header Bar -->
       <header class="h-16 border-b border-zinc-900 bg-zinc-950/20 backdrop-blur-md flex items-center justify-between px-8 shrink-0">
         <div>
-          <h2 class="text-sm font-bold text-white flex items-center gap-2 font-push">
+          <h2 class="text-sm font-bold text-white font-push">
             Control Plane
-            <span class="text-[9px] bg-zinc-900 border border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono">v1.0.0</span>
           </h2>
           <p class="text-[10px] text-zinc-500">Secure agent endpoints via multi-project proxy matrices</p>
         </div>
 
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2 text-[10px]">
-            <span class="w-2 h-2 rounded-full bg-zinc-400"></span>
-            <span class="text-zinc-550 font-medium">Gateway Cluster: </span>
-            <span class="font-bold text-zinc-300">Active</span>
-          </div>
-        </div>
+        <div class="flex items-center gap-4 font-push"></div>
       </header>
 
-      <!-- 2. Project Matrix Panel Grid (Multi-Project Support) -->
       <div class="px-8 pt-6 pb-2 text-left shrink-0">
         <div class="flex items-center justify-between mb-3.5">
-          <h3 class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 font-push">Active Shields Matrix</h3>
-          <button 
-            @click="createNewProject"
-            class="text-[9px] font-bold text-zinc-350 hover:text-white border border-zinc-850 bg-zinc-900/40 px-2.5 py-1 rounded cursor-pointer transition-all hover:border-zinc-700"
-          >
-            + New Project Shield
-          </button>
+          <h3 class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 font-push">Active Proxy</h3>
+
         </div>
         
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -768,7 +397,7 @@ const copySnippet = () => {
               <span class="text-[8px] font-bold px-1.5 py-0.5 rounded border font-sans uppercase shrink-0" :class="[
                 project.status === 'active' ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/30' : 'bg-red-950/20 text-red-400 border-red-900/30'
               ]">
-                {{ project.status === 'active' ? '🟢 Shielding' : '🔴 Blocked' }}
+                {{ project.status === 'active' ? '🟢 Active' : '🔴 Inactive' }}
               </span>
             </div>
             
@@ -793,56 +422,41 @@ const copySnippet = () => {
       <!-- Layout Panel Grid -->
       <div class="grid lg:grid-cols-12">
         
-        <!-- Left Column: Available Shelf (Node Library Shelf) -->
-        <div class="lg:col-span-3 p-6 border-r border-zinc-900 flex flex-col space-y-4 text-left">
+        <!-- Left Column: Instance Info & Client Keys -->
+        <div class="lg:col-span-3 p-6 border-r border-zinc-900 flex flex-col space-y-6 text-left">
+          <!-- Active Gateway Instance Status Info -->
           <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 mb-1">Node Shelf</h3>
-            <p class="text-[9px] text-zinc-550 leading-relaxed">Drag nodes to the canvas zone below or click add buttons to hook them up.</p>
-          </div>
-
-          <div class="space-y-2 flex-1">
-            <div 
-              v-for="(node, key) in nodes" 
-              v-show="node.type === 'guard'"
-              :key="key"
-              :draggable="!node.active"
-              @dragstart="handleSidebarDragStart(key as GuardKey)"
-              @dragend="handleSidebarDragEnd"
-              @click="selectedGuardKey = key as GuardKey"
-              class="cyber-card rounded p-3 border text-left transition-all hover:bg-zinc-900/30"
-              :class="[
-                node.active ? 'border-zinc-900 bg-zinc-900/10 opacity-50 cursor-default' : 'border-zinc-900 bg-zinc-950/40 cursor-grab active:cursor-grabbing',
-                selectedGuardKey === key ? 'ring-1 ring-zinc-700' : ''
-              ]"
-            >
-              <div class="flex items-start justify-between">
-                <div class="flex items-start gap-2.5">
-                  <div class="mt-0.5 w-5.5 h-5.5 rounded flex items-center justify-center bg-zinc-900 border border-zinc-855 text-zinc-600 shrink-0">
-                    <GripVertical class="w-3 h-3 cursor-grab" v-if="!node.active" />
-                    <Check class="w-3 h-3 text-zinc-450" v-else />
-                  </div>
-                  <div>
-                    <h4 class="text-[10px] font-bold text-zinc-300 font-push leading-tight">{{ node.name }}</h4>
-                    <p class="text-[8px] text-zinc-500 leading-normal mt-0.5">{{ node.description }}</p>
-                  </div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 mb-2">Instance Profile</h3>
+            <div class="space-y-2 text-[10px] font-mono">
+              <div class="p-2.5 rounded bg-zinc-950/40 border border-zinc-900 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Status</span>
+                  <span class="flex items-center gap-1.5 text-emerald-450 font-bold font-sans text-[8px] uppercase">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                    Online
+                  </span>
                 </div>
-                
-                <button 
-                  v-if="!node.active"
-                  @click.stop="activateNode(key as GuardKey)"
-                  class="p-0.5 rounded border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer shrink-0"
-                  title="Add to Workspace"
-                >
-                  <Plus class="w-3 h-3" />
-                </button>
+                <div class="flex items-center justify-between pt-1">
+                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Listen IP</span>
+                  <span class="text-zinc-300">127.0.0.1:8080</span>
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Prefix</span>
+                  <span class="text-zinc-300">/v1</span>
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                  <span class="text-zinc-600 uppercase text-[8px] font-sans font-bold">Config Store</span>
+                  <span class="text-zinc-300">state.json</span>
+                </div>
               </div>
             </div>
           </div>
+
           <!-- Go Gateway Client API Keys Manager -->
           <div class="border-t border-zinc-900 pt-4 flex flex-col space-y-3 shrink-0">
             <div>
               <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 mb-1">Gateway Client Keys</h3>
-              <p class="text-[9px] text-zinc-550 leading-relaxed">Generated tokens authorized to proxy prompts through Cerberus.</p>
+              <p class="text-[9px] text-zinc-600 leading-relaxed">Generated tokens authorized to proxy prompts through Cerberus.</p>
             </div>
 
             <!-- Create new key form -->
@@ -863,7 +477,7 @@ const copySnippet = () => {
             </div>
 
             <!-- Key List scrollbox -->
-            <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               <div 
                 v-for="key in apiKeys" 
                 :key="key.id"
@@ -881,343 +495,98 @@ const copySnippet = () => {
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div v-if="apiKeys.length === 0" class="text-center text-[9px] text-zinc-600 font-mono py-2">
-                No active keys.
-              </div>
             </div>
           </div>
         </div>
 
-        <!-- Right Side: Infinite Sandbox Canvas and Parameter Panel -->
-        <div class="lg:col-span-9 flex flex-col">
+        <!-- Right Side: Config Forms and Telemetry Details -->
+        <div class="lg:col-span-9 flex flex-col p-6 space-y-6">
           
-          <!-- Infinite Sandbox Canvas (400px Height) -->
-          <div class="p-6 border-b border-zinc-900 shrink-0">
-            <div 
-              @dragover.prevent
-              @drop="handleCanvasDrop"
-              @mousemove="onCanvasMouseMove"
-              @mouseup="stopNodeDrag"
-              @mouseleave="stopNodeDrag"
-              class="relative w-full h-[380px] border border-zinc-900 bg-zinc-950/40 rounded-lg overflow-hidden select-none"
-            >
-              <!-- Grid background lines -->
-              <div class="absolute inset-0 minimal-dashed opacity-25"></div>
+          <!-- Proxy Settings Form Card -->
+          <div class="cyber-card rounded p-5 border border-zinc-900 bg-zinc-900/10 text-left space-y-5">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">Gateway Core Configuration</h3>
+              <p class="text-[9.5px] text-zinc-500 leading-normal mt-0.5">Parameters synced in real-time with the running Go proxy instance</p>
+            </div>
 
-              <!-- Connections SVG Overlay Layer -->
-              <svg class="absolute inset-0 pointer-events-none w-full h-full">
-                <path 
-                  v-for="(path, idx) in connectionPaths" 
-                  :key="idx" 
-                  :d="path" 
-                  stroke="#3f3f46" 
-                  stroke-width="1.5" 
-                  fill="none" 
-                  stroke-dasharray="3,3"
+            <div class="grid md:grid-cols-2 gap-5">
+              <div class="space-y-1.5 md:col-span-2">
+                <label class="text-[10px] font-semibold text-zinc-350 font-push">Proxy Instance Name</label>
+                <input 
+                  type="text" 
+                  v-model="activeProject.name" 
+                  placeholder="Enter proxy instance name..."
+                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
                 />
-              </svg>
+              </div>
 
-              <!-- Node Cards list -->
-              <div 
-                v-for="node in Object.values(nodes).filter(n => n.active)" 
-                :key="node.key"
-                @mousedown="selectedGuardKey = (node.type === 'guard' ? node.key : 'gatewaySettings') as GuardKey"
-                class="absolute w-52 h-[76px] rounded bg-zinc-900 border border-zinc-800 flex flex-col justify-between text-left p-2.5 shadow-lg select-none"
-                :class="[
-                  ((node.type === 'guard' && selectedGuardKey === node.key) || (node.type !== 'guard' && selectedGuardKey === 'gatewaySettings')) ? 'border-zinc-500 bg-zinc-900/90' : 'border-zinc-850 bg-zinc-900/60',
-                  node.type === 'guard' ? 'hover:border-zinc-600' : 'bg-zinc-950/80 border-dashed border-zinc-800'
-                ]"
-                :style="{ left: node.x + 'px', top: node.y + 'px' }"
-              >
-                <!-- Left Connection Input Port -->
-                <div v-if="node.type !== 'input'" class="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-zinc-800 border border-zinc-955 flex items-center justify-center">
-                  <div class="w-1.5 h-1.5 rounded-full bg-zinc-500"></div>
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-semibold text-zinc-350 font-push">Admin Secret Token</label>
+                <input 
+                  type="password" 
+                  v-model="adminToken" 
+                  placeholder="Enter CERBERUS_ADMIN_TOKEN..."
+                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                />
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Destination URL</label>
+                <input 
+                  type="text" 
+                  v-model="guardsConfig.gatewaySettings.upstream" 
+                  placeholder="e.g. https://openrouter.ai/api/v1"
+                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                />
+              </div>
+
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Authorization Key</label>
+                <input 
+                  type="password" 
+                  v-model="guardsConfig.gatewaySettings.upstreamKey" 
+                  placeholder="Keep empty to forward client token unchanged"
+                  class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                />
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-semibold text-zinc-350 font-push">Max Payload (Bytes)</label>
+                  <input 
+                    type="number" 
+                    v-model.number="guardsConfig.gatewaySettings.maxBodyBytes" 
+                    class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                  />
                 </div>
-
-                <!-- Right Connection Output Port -->
-                <div v-if="node.type !== 'output'" class="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-zinc-800 border border-zinc-955 flex items-center justify-center">
-                  <div class="w-1.5 h-1.5 rounded-full bg-zinc-500"></div>
-                </div>
-
-                <!-- Header drag handle -->
-                <div 
-                  @mousedown="startNodeDrag($event, node.key)"
-                  class="flex items-center gap-1.5 pb-1 border-b border-zinc-850/60 cursor-grab active:cursor-grabbing text-zinc-450 hover:text-white"
-                >
-                  <GripVertical class="w-3 h-3 text-zinc-600 shrink-0 animate-pulse" />
-                  <span class="text-[10px] font-bold truncate leading-none font-push">{{ node.name }}</span>
-                  
-                  <!-- Trash button on guard nodes -->
-                  <button 
-                    v-if="node.type === 'guard'"
-                    @click.stop="deactivateNode(node.key as GuardKey)"
-                    class="ml-auto p-0.5 text-zinc-650 hover:text-white cursor-pointer shrink-0"
-                    title="Remove Node"
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-semibold text-zinc-350 font-push">Outbound Mode</label>
+                  <select 
+                    v-model="guardsConfig.gatewaySettings.outboundMode"
+                    class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-push"
                   >
-                    <Trash2 class="w-3 h-3" />
-                  </button>
-                </div>
-
-                <!-- Node Metadata Description -->
-                <div class="text-[8px] text-zinc-500 leading-normal line-clamp-2 select-none">
-                  {{ node.description }}
+                    <option value="off">Off (Passthrough)</option>
+                    <option value="buffer">Buffer (Scan Full)</option>
+                    <option value="stream">Stream (Scan SSE)</option>
+                  </select>
                 </div>
               </div>
+            </div>
+
+            <div v-if="syncError" class="text-[9.5px] text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2.5 rounded">
+              {{ syncError }}
             </div>
           </div>
 
-          <!-- Bottom Panel: Config details and compiled JSON -->
-          <div class="grid md:grid-cols-12 p-6 gap-6 bg-zinc-900/10 border-t border-zinc-900">
+          <!-- Config JSON & Integration snippet Split Grid -->
+          <div class="grid md:grid-cols-12 gap-6 items-start">
             
-            <!-- Parameters configuration detail -->
-            <div class="md:col-span-5 flex flex-col justify-start space-y-4">
-              <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-350 font-push text-left">
-                <Settings class="w-3.5 h-3.5 text-zinc-450" />
-                Parameters: {{ guardsConfig[selectedGuardKey].name }}
-              </div>
-
-              <!-- 1. The Policy Visualizer Interface -->
-              <div class="cyber-card rounded p-4 border border-zinc-850 bg-zinc-900/10 text-left space-y-4">
-                
-                <!-- Active/Enable switch control -->
-                <div v-if="selectedGuardKey !== 'gatewaySettings'" class="flex items-center justify-between pb-3 border-b border-zinc-850/50">
-                  <span class="text-[10px] font-bold text-zinc-300 font-push">Active Pipeline State</span>
-                  <button 
-                    @click="nodes[selectedGuardKey].active = !nodes[selectedGuardKey].active; syncProjectGuardsCount()"
-                    class="w-8 h-4.5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer focus:outline-none shrink-0"
-                    :class="nodes[selectedGuardKey].active ? 'bg-zinc-200' : 'bg-zinc-800'"
-                  >
-                    <div 
-                      class="w-3.5 h-3.5 rounded-full bg-zinc-950 transition-transform duration-200"
-                      :class="nodes[selectedGuardKey].active ? 'translate-x-3.5' : 'translate-x-0'"
-                    ></div>
-                  </button>
-                </div>
-
-                <!-- A. Ingress Sentry (Prompt Injection) Visual settings -->
-                <div v-if="selectedGuardKey === 'promptInjection'" class="space-y-4">
-                  <!-- Strictness Level buttons toggle -->
-                  <div class="space-y-1.5">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Security Strictness Level</label>
-                    <div class="flex bg-zinc-950 border border-zinc-850 rounded p-0.5 text-[9px] font-mono">
-                      <button 
-                        @click="strictnessLevel = 'low'"
-                        class="flex-1 py-1 text-center font-bold rounded cursor-pointer transition-all uppercase"
-                        :class="strictnessLevel === 'low' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-300'"
-                      >
-                        Low
-                      </button>
-                      <button 
-                        @click="strictnessLevel = 'medium'"
-                        class="flex-1 py-1 text-center font-bold rounded cursor-pointer transition-all uppercase"
-                        :class="strictnessLevel === 'medium' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-300'"
-                      >
-                        Medium
-                      </button>
-                      <button 
-                        @click="strictnessLevel = 'high'"
-                        class="flex-1 py-1 text-center font-bold rounded cursor-pointer transition-all uppercase"
-                        :class="strictnessLevel === 'high' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-300'"
-                      >
-                        High
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- Sensitivity Slider -->
-                  <div class="space-y-1.5">
-                    <div class="flex justify-between text-[10px] font-semibold text-zinc-350">
-                      <span>Vector Match Sensitivity</span>
-                      <span class="text-zinc-450 font-mono">{{ guardsConfig.promptInjection.similarityThreshold }}%</span>
-                    </div>
-                    <div class="pt-1">
-                      <Slider v-model="guardsConfig.promptInjection.similarityThreshold" :min="30" :max="99" class="w-full" />
-                    </div>
-                  </div>
-
-                  <!-- Blacklist custom term tag builder -->
-                  <div class="space-y-1.5">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Custom Blacklist Terms</label>
-                    <div class="flex flex-wrap gap-1.5 p-2 bg-zinc-950 border border-zinc-900 rounded min-h-[38px] items-center">
-                      <span 
-                        v-for="(tag, idx) in promptInjectionTags" 
-                        :key="idx" 
-                        class="inline-flex items-center gap-1 bg-zinc-900 text-zinc-300 px-2 py-0.5 rounded text-[9px] border border-zinc-800 font-mono"
-                      >
-                        {{ tag }}
-                        <button 
-                          @click="removePatternTag(idx)" 
-                          type="button" 
-                          class="text-zinc-500 hover:text-zinc-300 font-bold cursor-pointer text-[8px]"
-                        >
-                          ×
-                        </button>
-                      </span>
-                      <input 
-                        v-model="newPatternTag" 
-                        @keydown.enter.prevent="addPatternTag"
-                        @keydown.backspace="handlePatternTagBackspace"
-                        placeholder="Add term + Enter..."
-                        class="flex-1 bg-transparent border-none text-[10px] text-zinc-200 focus:outline-none focus:ring-0 min-w-[100px] placeholder:text-zinc-700"
-                      />
-                    </div>
-                  </div>
-
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Threat Action Mode</label>
-                    <select v-model="guardsConfig.promptInjection.threatAction" class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-200 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none">
-                      <option value="BLOCK_CONNECTION">BLOCK_CONNECTION</option>
-                      <option value="SIMULATE_SAFE">SIMULATE_SAFE</option>
-                      <option value="ALERT_ONLY">ALERT_ONLY</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- B. Runtime Firewall (Tool call blacklist tags) -->
-                <div v-else-if="selectedGuardKey === 'toolFirewall'" class="space-y-4">
-                  <div class="space-y-1.5">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">System Call Blacklist</label>
-                    <div class="flex flex-wrap gap-1.5 p-2 bg-zinc-950 border border-zinc-900 rounded min-h-[38px] items-center">
-                      <span 
-                        v-for="(tag, idx) in toolFirewallTags" 
-                        :key="idx" 
-                        class="inline-flex items-center gap-1 bg-zinc-900 text-zinc-300 px-2 py-0.5 rounded text-[9px] border border-zinc-800 font-mono"
-                      >
-                        {{ tag }}
-                        <button 
-                          @click="removeToolFirewallTag(idx)" 
-                          type="button" 
-                          class="text-zinc-500 hover:text-zinc-300 font-bold cursor-pointer text-[8px]"
-                        >
-                          ×
-                        </button>
-                      </span>
-                      <input 
-                        v-model="newToolTag" 
-                        @keydown.enter.prevent="addToolFirewallTag"
-                        @keydown.backspace="handleToolTagBackspace"
-                        placeholder="Add command + Enter..."
-                        class="flex-1 bg-transparent border-none text-[10px] text-zinc-200 focus:outline-none focus:ring-0 min-w-[100px] placeholder:text-zinc-700"
-                      />
-                    </div>
-                  </div>
-
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Incident Severity</label>
-                    <select v-model="guardsConfig.toolFirewall.alertSeverity" class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-200 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none">
-                      <option value="CRITICAL">CRITICAL</option>
-                      <option value="WARNING">WARNING</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- C. Egress Censor PII -->
-                <div v-else-if="selectedGuardKey === 'piiMasker'" class="space-y-4">
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Redaction Replacement String</label>
-                    <InputText v-model="guardsConfig.piiMasker.maskString" class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" />
-                  </div>
-
-                  <div class="space-y-1.5">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Target Masking Entities</label>
-                    <div class="grid grid-cols-2 gap-2 mt-1">
-                      <div v-for="type in ['API Keys', 'Emails', 'Credit Cards', 'Phone Numbers', 'IP Addresses', 'System Paths']" :key="type" class="flex items-center gap-2">
-                        <input 
-                          type="checkbox" 
-                          :value="type" 
-                          v-model="guardsConfig.piiMasker.maskTypes" 
-                          class="w-3.5 h-3.5 border border-zinc-800 rounded bg-zinc-950 text-zinc-200 focus:ring-0 focus:outline-none shrink-0"
-                        />
-                        <span class="text-[9px] text-zinc-450 font-medium select-none">{{ type }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- D. Egress Censor Rate Limiter -->
-                <div v-else-if="selectedGuardKey === 'rateLimiter'" class="space-y-4">
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Ceiling Tokens Per Minute (TPM)</label>
-                    <input type="number" v-model.number="guardsConfig.rateLimiter.maxTokensPerMinute" class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none" />
-                  </div>
-
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Daily Budget Hard Limit (USD)</label>
-                    <div class="flex items-center gap-2 bg-zinc-950 border border-zinc-900 rounded p-1">
-                      <span class="text-xs text-zinc-600 pl-1">$</span>
-                      <input type="number" step="0.5" v-model.number="guardsConfig.rateLimiter.costCeilingPerDay" class="w-full text-[10px] bg-transparent border-none text-zinc-150 p-1 focus:outline-none" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- E. Gateway Core Settings (Go Backend Config) -->
-                <div v-else-if="selectedGuardKey === 'gatewaySettings'" class="space-y-4">
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Admin Secret Token</label>
-                    <input 
-                      type="password" 
-                      v-model="adminToken" 
-                      placeholder="Enter CERBERUS_ADMIN_TOKEN..."
-                      class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
-                    />
-                  </div>
-
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Destination URL</label>
-                    <input 
-                      type="text" 
-                      v-model="guardsConfig.gatewaySettings.upstream" 
-                      placeholder="e.g. https://openrouter.ai/api/v1"
-                      class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
-                    />
-                  </div>
-
-                  <div class="space-y-1">
-                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Authorization Key</label>
-                    <input 
-                      type="password" 
-                      v-model="guardsConfig.gatewaySettings.upstreamKey" 
-                      placeholder="Keep empty to forward client token unchanged"
-                      class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
-                    />
-                  </div>
-
-                  <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1">
-                      <label class="text-[10px] font-semibold text-zinc-350 font-push">Max Payload (Bytes)</label>
-                      <input 
-                        type="number" 
-                        v-model.number="guardsConfig.gatewaySettings.maxBodyBytes" 
-                        class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
-                      />
-                    </div>
-                    <div class="space-y-1">
-                      <label class="text-[10px] font-semibold text-zinc-350 font-push">Outbound Mode</label>
-                      <select 
-                        v-model="guardsConfig.gatewaySettings.outboundMode"
-                        class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-push"
-                      >
-                        <option value="off">Off (Passthrough)</option>
-                        <option value="buffer">Buffer (Scan Full)</option>
-                        <option value="stream">Stream (Scan SSE)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div v-if="syncError" class="text-[9.5px] text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2 rounded">
-                    {{ syncError }}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
             <!-- Compiled JSON details -->
-            <div class="md:col-span-3 flex flex-col justify-between space-y-3 text-left">
-              <div class="text-xs font-semibold uppercase tracking-wider text-zinc-355 font-push">
-                Compiled Gateway JSON
+            <div class="md:col-span-5 flex flex-col justify-start space-y-3 text-left">
+              <div class="text-xs font-semibold uppercase tracking-wider text-zinc-350 font-push">
+                Compiled Configuration
               </div>
-              <div class="cyber-card rounded p-3 font-mono text-[9px] text-zinc-400 border border-zinc-900 bg-zinc-950 flex-1 overflow-y-auto max-h-56">
+              <div class="cyber-card rounded p-3.5 font-mono text-[9px] text-zinc-400 border border-zinc-900 bg-zinc-950 h-56 overflow-y-auto">
                 <pre class="leading-relaxed">{{ compiledJson }}</pre>
               </div>
 
@@ -1228,7 +597,7 @@ const copySnippet = () => {
                   class="w-full flex items-center justify-center gap-2 bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-[10px] py-2.5 px-4 rounded transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-push"
                 >
                   <Play class="w-3.5 h-3.5 fill-current" />
-                  <span v-if="!isDeploying">Sync Gateway Endpoints</span>
+                  <span v-if="!isDeploying">Sync Config to Proxy</span>
                   <span v-else>Deploying cluster...</span>
                 </button>
                 <div v-if="justDeployed" class="bg-zinc-900 border border-zinc-850 rounded p-2 text-[9px] text-zinc-450 text-center">
@@ -1238,7 +607,7 @@ const copySnippet = () => {
             </div>
 
             <!-- Integration snippets -->
-            <div class="md:col-span-4 flex flex-col justify-start space-y-2.5 text-left">
+            <div class="md:col-span-7 flex flex-col justify-start space-y-3 text-left">
               <div class="text-xs font-semibold uppercase tracking-wider text-zinc-350 font-push">
                 Integration Hook
               </div>
@@ -1257,26 +626,25 @@ const copySnippet = () => {
               </div>
 
               <!-- Snippet Box -->
-              <div class="relative flex-1 min-h-[140px] flex flex-col justify-between">
+              <div class="relative h-64 flex flex-col justify-between">
                 <button 
                   @click="copySnippet"
-                  class="absolute top-2 right-2 text-zinc-500 hover:text-white p-1 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
+                  class="absolute top-2.5 right-2.5 text-zinc-500 hover:text-white p-1 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Copy snippet"
                 >
                   <Check v-if="copied" class="w-3 h-3 text-zinc-300" />
                   <Copy v-else class="w-3 h-3" />
                 </button>
                 
-                <div class="cyber-card rounded p-3 font-mono text-[9px] text-zinc-450 bg-zinc-950/80 border border-zinc-800 text-left overflow-x-auto flex-1 max-h-48">
+                <div class="cyber-card rounded p-3.5 font-mono text-[9px] text-zinc-450 bg-zinc-950 border border-zinc-800 text-left overflow-x-auto h-full overflow-y-auto">
                   <pre class="leading-relaxed">{{ codeSnippets[activeTab] }}</pre>
                 </div>
               </div>
             </div>
-
+            
           </div>
 
         </div>
-
       </div>
 
     </main>
