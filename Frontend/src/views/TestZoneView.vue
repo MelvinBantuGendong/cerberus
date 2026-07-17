@@ -42,6 +42,12 @@ const disabled = ref<Set<string>>(new Set())
 const configError = ref('')
 const savingRule = ref<string | null>(null)
 
+const upstream = ref('')
+const outboundMode = ref('buffer')
+const maxBodyBytes = ref(4194304)
+const isDeploying = ref(false)
+const justDeployed = ref(false)
+
 const inboundDetectors = computed(() => catalog.value.filter((d) => d.direction === 'inbound'))
 const outboundDetectors = computed(() => catalog.value.filter((d) => d.direction === 'outbound'))
 
@@ -67,8 +73,42 @@ const loadCatalog = async () => {
     catalog.value = await detRes.json()
     const cfg = await cfgRes.json()
     disabled.value = new Set<string>(cfg.disabled_rules || [])
+
+    // Set configuration variables
+    upstream.value = cfg.upstream || ''
+    outboundMode.value = cfg.outbound_mode || 'buffer'
+    maxBodyBytes.value = cfg.max_body_bytes || 4194304
   } catch (err: any) {
     configError.value = `Could not reach the admin API (${err.message}). Verify the token and that the Go gateway is running with CERBERUS_ADMIN_TOKEN set.`
+  }
+}
+
+const deployGateway = async () => {
+  isDeploying.value = true
+  configError.value = ''
+  justDeployed.value = false
+  try {
+    const res = await fetch('/admin/config', {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        upstream: upstream.value,
+        max_body_bytes: Number(maxBodyBytes.value),
+        outbound_mode: outboundMode.value,
+        disabled_rules: Array.from(disabled.value)
+      })
+    })
+    if (!res.ok) {
+      throw new Error(await res.text())
+    }
+    justDeployed.value = true
+    setTimeout(() => {
+      justDeployed.value = false
+    }, 3000)
+  } catch (err: any) {
+    configError.value = `Sync failed: ${err.message}`
+  } finally {
+    isDeploying.value = false
   }
 }
 
@@ -278,6 +318,53 @@ onMounted(loadCatalog)
               >
                 Load
               </button>
+            </div>
+          </div>
+
+          <!-- Gateway Settings Sync -->
+          <div class="space-y-3.5 border-t border-zinc-900 pt-5">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-350 font-push">Gateway Settings</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="col-span-2 space-y-1.5">
+                <label class="text-[10px] font-semibold text-zinc-400 font-push">Upstream Destination</label>
+                <input 
+                  type="text" 
+                  v-model="upstream"
+                  placeholder="e.g. https://openrouter.ai/api/v1"
+                  class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:outline-none font-mono"
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-semibold text-zinc-400 font-push">Outbound Mode</label>
+                <select 
+                  v-model="outboundMode"
+                  class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:outline-none font-push"
+                >
+                  <option value="off">Off (Passthrough)</option>
+                  <option value="buffer">Buffer (Scan Full)</option>
+                  <option value="stream">Stream (Scan SSE)</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-semibold text-zinc-400 font-push">Max Payload (Bytes)</label>
+                <input 
+                  type="number" 
+                  v-model.number="maxBodyBytes"
+                  class="w-full text-xs bg-zinc-950 border border-zinc-900 text-zinc-150 p-2.5 rounded focus:outline-none font-mono"
+                />
+              </div>
+            </div>
+            <button
+              @click="deployGateway"
+              :disabled="isDeploying"
+              class="w-full flex items-center justify-center gap-2 border border-rose-900/60 bg-rose-950/15 text-rose-455 hover:bg-rose-900/30 hover:text-rose-200 font-bold text-xs py-2 px-4 rounded transition-all duration-150 disabled:opacity-50 cursor-pointer font-push"
+            >
+              <Play class="w-3 h-3 fill-current" />
+              <span v-if="!isDeploying">Sync Config to Proxy</span>
+              <span v-else>Syncing...</span>
+            </button>
+            <div v-if="justDeployed" class="text-[10px] text-emerald-450 font-mono text-center mt-1.5">
+              Gateway config successfully synced.
             </div>
           </div>
 
