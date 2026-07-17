@@ -651,22 +651,4 @@ const copySnippet = () => {
   </div>
 </template>
 
-<style scoped>
-/* Minimal override for PrimeVue Slider */
-:deep(.p-slider) {
-  background: #27272a !important; /* zinc-800 */
-  height: 3px !important;
-}
-:deep(.p-slider-range) {
-  background: #71717a !important; /* zinc-500 */
-}
-:deep(.p-slider-handle) {
-  background: #f4f4f5 !important; /* zinc-100 */
-  border: 1px solid #71717a !important;
-  width: 10px !important;
-  height: 10px !important;
-  margin-top: -3.5px !important;
-  margin-left: -5px !important;
-  box-shadow: none !important;
-}
-</style>
+

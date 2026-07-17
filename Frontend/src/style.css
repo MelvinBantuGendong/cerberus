@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@plugin "tailwindcss-primeui";
 
 @theme {
   --font-sans: 'Fira Code', monospace;
