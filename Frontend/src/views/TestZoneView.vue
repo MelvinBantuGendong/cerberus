@@ -270,7 +270,7 @@ onMounted(loadCatalog)
             :class="activeRoute === 'testzone' ? 'border-rose-900/60 bg-rose-950/10 text-rose-455' : 'border-transparent text-zinc-400 hover:bg-zinc-900/60 hover:text-white'"
           >
             <Bug class="w-3.5 h-3.5" />
-            Test Zone
+            Rule Set & Playground
           </router-link>
         </nav>
       </div>
