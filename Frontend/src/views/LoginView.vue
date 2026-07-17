@@ -298,62 +298,195 @@ const selectedScenarioKey = ref<keyof typeof scenarios>('safe')
 const customInput = ref('')
 const isUsingCustom = ref(false)
 
-const activeScenario = computed(() => {
-  if (isUsingCustom.value) {
-    const text = customInput.value.toLowerCase()
-    let action: 'allow' | 'block' | 'flag' = 'allow'
-    let score = 0.01
-    let categories: string[] = []
-    let matchedRules: string[] = []
-    let direction: 'inbound' | 'outbound' = 'inbound'
-    let textTrust: 'trusted' | 'semi_trusted' | 'untrusted' | 'default' = 'default'
-    let output = customInput.value
-
-    if (text.includes('ignore') || text.includes('jailbreak') || text.includes('instruction')) {
-      action = 'block'
-      score = 0.95
-      categories = ['prompt_injection']
-      matchedRules = ['rule_obfuscation_patterns']
-      textTrust = 'untrusted'
-      output = '[CONNECTION TERMINATED] Jailbreak vector intercepted by Ingress Sentry.'
-    } else if (text.includes('rm ') || text.includes('sudo') || text.includes('drop table')) {
-      action = 'block'
-      score = 0.99
-      categories = ['destructive_command']
-      matchedRules = ['rule_dangerous_system_call']
-      textTrust = 'untrusted'
-      output = '[EXECUTION BLOCKED] System execution terminated by Runtime Firewall.'
-    } else if (text.includes('sk_') || text.includes('key') || text.includes('token')) {
-      action = 'flag'
-      score = 0.70
-      categories = ['context_leak']
-      matchedRules = ['rule_credential_exposure']
-      direction = 'outbound'
-      textTrust = 'semi_trusted'
-      output = 'Processing stream data... Credentials masked securely: [REDACTED_SECURE]'
-    } else {
-      output = `Standard pass-through query processed. Response forwarded.`
-    }
-
-    return {
-      name: 'Custom Prompt',
-      input: customInput.value,
-      output,
-      verdict: { action, score, categories, matchedRules, direction, trustLevel: textTrust }
-    }
-  }
-  return scenarios[selectedScenarioKey.value]
+const sandboxOutput = ref('To compute the response average, sum the total latencies and divide...')
+const sandboxVerdict = ref<any>({
+  action: 'allow',
+  score: 0.01,
+  categories: [],
+  matchedRules: [],
+  direction: 'inbound',
+  trustLevel: 'trusted'
 })
+
+const activeScenario = computed(() => {
+  return {
+    name: isUsingCustom.value ? 'Custom Prompt' : scenarios[selectedScenarioKey.value].name,
+    input: isUsingCustom.value ? customInput.value : scenarios[selectedScenarioKey.value].input,
+    output: sandboxOutput.value,
+    verdict: sandboxVerdict.value
+  }
+})
+
+const isTestingRealProxy = ref(false)
+const sandboxError = ref('')
+
+const runRealProxyCheck = async (promptText: string) => {
+  if (!promptText) return
+  isTestingRealProxy.value = true
+  sandboxError.value = ''
+  
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    // Optional client key if known
+    const storedClientKey = localStorage.getItem('cerberus_last_client_key')
+    if (storedClientKey) {
+      headers['Authorization'] = `Bearer ${storedClientKey}`
+    }
+
+    const res = await fetch('/v1/chat/completions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: promptText }]
+      })
+    })
+
+    if (res.status === 403) {
+      const data = await res.json()
+      sandboxVerdict.value = {
+        action: data.action || 'block',
+        score: data.score || 0.99,
+        categories: data.categories || ['prompt_injection'],
+        matchedRules: data.matched_rules || ['rule_intercepted'],
+        direction: data.direction || 'inbound',
+        trustLevel: data.trust_level || 'untrusted'
+      }
+      sandboxOutput.value = '[CONNECTION TERMINATED] Threat intercepted by Ingress Sentry.'
+      triggerFlash(sandboxVerdict.value.action)
+    } else if (res.status === 401) {
+      sandboxError.value = 'Go Gateway requires a valid client key (Auth enabled).'
+      sandboxVerdict.value = {
+        action: 'block',
+        score: 0.95,
+        categories: ['auth_failure'],
+        matchedRules: ['invalid_authorization_token'],
+        direction: 'inbound',
+        trustLevel: 'untrusted'
+      }
+      sandboxOutput.value = '[UNAUTHORIZED] Access denied by Cerberus Core.'
+    } else if (res.ok) {
+      const data = await res.json()
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        sandboxOutput.value = data.choices[0].message.content
+      } else {
+        sandboxOutput.value = 'Forwarded to upstream successfully. Output format unrecognized.'
+      }
+      sandboxVerdict.value = {
+        action: 'allow',
+        score: 0.01,
+        categories: [],
+        matchedRules: [],
+        direction: 'inbound',
+        trustLevel: 'trusted'
+      }
+    } else {
+      const outboundHeader = res.headers.get('X-Cerberus-Outbound')
+      if (outboundHeader === 'block') {
+        sandboxVerdict.value = {
+          action: 'block',
+          score: 0.99,
+          categories: ['context_leak'],
+          matchedRules: ['system_prompt_echo'],
+          direction: 'outbound',
+          trustLevel: 'untrusted'
+        }
+        sandboxOutput.value = '[EXECUTION BLOCKED] Response output blocked by Egress Censor.'
+        triggerFlash('block')
+      } else if (outboundHeader === 'flag') {
+        sandboxVerdict.value = {
+          action: 'flag',
+          score: 0.65,
+          categories: ['context_leak'],
+          matchedRules: ['rule_credential_exposure'],
+          direction: 'outbound',
+          trustLevel: 'semi_trusted'
+        }
+        sandboxOutput.value = 'Processing stream data... Credentials masked securely: [REDACTED_SECURE]'
+        triggerFlash('flag')
+      } else {
+        sandboxVerdict.value = {
+          action: 'allow',
+          score: 0.05,
+          categories: [],
+          matchedRules: [],
+          direction: 'inbound',
+          trustLevel: 'default'
+        }
+        sandboxOutput.value = `Passed scan successfully. Upstream status: ${res.status}.`
+      }
+    }
+  } catch (err: any) {
+    console.error('Proxy check failed:', err)
+    sandboxError.value = 'Go Gateway is offline. Start backend server on port 8080.'
+    runLocalSimulation(promptText)
+  } finally {
+    isTestingRealProxy.value = false
+  }
+}
+
+const runLocalSimulation = (promptText: string) => {
+  const text = promptText.toLowerCase()
+  let action: 'allow' | 'block' | 'flag' = 'allow'
+  let score = 0.01
+  let categories: string[] = []
+  let matchedRules: string[] = []
+  let direction: 'inbound' | 'outbound' = 'inbound'
+  let textTrust: 'trusted' | 'semi_trusted' | 'untrusted' | 'default' = 'default'
+  let output = promptText
+
+  if (text.includes('ignore') || text.includes('jailbreak') || text.includes('instruction')) {
+    action = 'block'
+    score = 0.95
+    categories = ['prompt_injection']
+    matchedRules = ['rule_obfuscation_patterns']
+    textTrust = 'untrusted'
+    output = '[CONNECTION TERMINATED] Jailbreak vector intercepted by Ingress Sentry.'
+  } else if (text.includes('rm ') || text.includes('sudo') || text.includes('drop table')) {
+    action = 'block'
+    score = 0.99
+    categories = ['destructive_command']
+    matchedRules = ['rule_dangerous_system_call']
+    textTrust = 'untrusted'
+    output = '[EXECUTION BLOCKED] System execution terminated by Runtime Firewall.'
+  } else if (text.includes('sk_') || text.includes('key') || text.includes('token')) {
+    action = 'flag'
+    score = 0.70
+    categories = ['context_leak']
+    matchedRules = ['rule_credential_exposure']
+    direction = 'outbound'
+    textTrust = 'semi_trusted'
+    output = 'Processing stream data... Credentials masked securely: [REDACTED_SECURE]'
+  } else {
+    output = `Standard pass-through query processed. Response forwarded.`
+  }
+
+  sandboxVerdict.value = { action, score, categories, matchedRules, direction, trustLevel: textTrust }
+  sandboxOutput.value = output
+}
 
 const selectPreset = (key: keyof typeof scenarios) => {
   isUsingCustom.value = false
   selectedScenarioKey.value = key
   customInput.value = ''
+  
+  const scene = scenarios[key]
+  sandboxVerdict.value = scene.verdict
+  sandboxOutput.value = scene.output
+  
+  runRealProxyCheck(scene.input)
 }
 
+let debounceTimer: any = null
 watch(customInput, (newVal) => {
   if (newVal) {
     isUsingCustom.value = true
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      runRealProxyCheck(newVal)
+    }, 450)
   }
 })
 
@@ -438,6 +571,11 @@ const animationClass = computed(() => {
         background: `radial-gradient(180px circle at ${orbX}px ${orbY}px, rgba(239, 68, 68, 0.12), transparent 75%)`
       }"
     ></div>
+
+    <!-- Fixed Glowing Red Ball Spots (Aesthetic Accents) -->
+    <div class="fixed top-[15%] right-[10%] w-[450px] h-[450px] bg-red-600/5 rounded-full blur-[140px] pointer-events-none z-0 animate-pulse-slow"></div>
+    <div class="fixed bottom-[20%] left-[5%] w-[350px] h-[350px] bg-red-800/4 rounded-full blur-[110px] pointer-events-none z-0"></div>
+    <div class="fixed top-[60%] right-[45%] w-[250px] h-[250px] bg-red-500/6 rounded-full blur-[90px] pointer-events-none z-0"></div>
 
     <!-- Hero Screen Section -->
     <section class="min-h-screen flex flex-col items-center justify-center px-6 relative z-10 text-center space-y-8">
@@ -643,7 +781,7 @@ const animationClass = computed(() => {
         <div class="text-left max-w-2xl space-y-1.5 pt-8 border-t border-zinc-900">
           <h2 class="text-lg font-bold text-white tracking-tight font-push">Technical Subsystems</h2>
           <p class="text-xs text-zinc-550 leading-relaxed font-sans">
-            Under the hood, Cerberus compiles lightweight security rules into WebAssembly filters. These are executed across three dedicated security layers:
+            Under the hood, Cerberus compiles developer-defined safety rules into a high-performance Go reverse proxy pipeline executing across three dedicated security layers:
           </p>
         </div>
 
@@ -689,7 +827,7 @@ const animationClass = computed(() => {
                   </span>
                 </div>
                 <p class="text-[10px] text-zinc-500 leading-relaxed">
-                  Scans incoming user prompts for jailbreaks and injection attacks. It uses vector embeddings to compare user input against known threat patterns before forwarding.
+                  Evaluates incoming JSON completions. It uses optimized regex pattern classification to parse message arrays and block prompt overrides (like "ignore previous rules") or jailbreak attempts before they strike the LLM.
                 </p>
               </div>
 
@@ -702,7 +840,7 @@ const animationClass = computed(() => {
                   </span>
                 </div>
                 <p class="text-[10px] text-zinc-500 leading-relaxed">
-                  Monitors tool executions and system calls. If an AI agent attempts to run a hazardous command (like file system deletions or database drops), the firewall intercepts and halts the execution.
+                  Monitors and intercepts tool argument signatures and command payloads. If an agent attempts to invoke hazardous functions (e.g. system deletions, database table drops, or formatting commands), the call is instantly halted.
                 </p>
               </div>
 
@@ -715,7 +853,7 @@ const animationClass = computed(() => {
                   </span>
                 </div>
                 <p class="text-[10px] text-zinc-500 leading-relaxed">
-                  Audits outgoing AI responses. It sanitizes completions by masking sensitive details (like credentials, emails, or credit cards) and halts responses that exceed token/cost limits.
+                  Sanitizes outbound model responses and streaming event chunks (SSE). It redacts PII or secrets (like API keys, JWTs, and phone numbers) on-the-fly, and blocks prompt leaks by matching rolling 8-word system prompt shingles.
                 </p>
               </div>
             </div>
@@ -806,5 +944,14 @@ const animationClass = computed(() => {
 
 .animate-flag {
   animation: flow-flag 3s infinite linear;
+}
+
+/* Slow breathing background pulse */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 14s infinite ease-in-out;
 }
 </style>

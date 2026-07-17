@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Shield, 
@@ -147,6 +147,14 @@ const guardsConfig = ref({
     description: 'Enforces hard ceilings and token limits',
     maxTokensPerMinute: 15000,
     costCeilingPerDay: 5.0
+  },
+  gatewaySettings: {
+    name: 'Gateway Core Config',
+    description: 'Binds parameters directly to the active Go backend proxy',
+    upstream: 'https://openrouter.ai/api/v1',
+    upstreamKey: '',
+    maxBodyBytes: 4194304,
+    outboundMode: 'buffer'
   }
 })
 
@@ -222,7 +230,7 @@ const strictnessLevel = computed({
   }
 })
 
-type GuardKey = 'promptInjection' | 'toolFirewall' | 'piiMasker' | 'rateLimiter';
+type GuardKey = 'promptInjection' | 'toolFirewall' | 'piiMasker' | 'rateLimiter' | 'gatewaySettings';
 const selectedGuardKey = ref<GuardKey>('promptInjection')
 
 // 2D Node Sandbox Definitions
@@ -461,11 +469,114 @@ const compiledJson = computed(() => {
   }, null, 2)
 })
 
-// Deploy simulation
-const deployGateway = () => {
+// Real API Integration with Go Backend Proxy
+const adminToken = ref(localStorage.getItem('cerberus_admin_token') || 'test_token')
+const syncError = ref('')
+const apiKeys = ref<any[]>([])
+const newKeyLabel = ref('')
+
+const fetchBackendConfig = async () => {
+  if (!adminToken.value) return
+  syncError.value = ''
+  try {
+    const res = await fetch('/admin/config', {
+      headers: {
+        'Authorization': `Bearer ${adminToken.value}`
+      }
+    })
+    if (!res.ok) {
+      throw new Error(`HTTP error ${res.status}`)
+    }
+    const data = await res.json()
+    guardsConfig.value.gatewaySettings.upstream = data.upstream
+    guardsConfig.value.gatewaySettings.maxBodyBytes = data.max_body_bytes
+    guardsConfig.value.gatewaySettings.outboundMode = data.outbound_mode
+  } catch (err: any) {
+    console.error('Failed to sync with backend:', err)
+    syncError.value = 'Could not sync with Go backend. Verify token and port.'
+  }
+}
+
+const fetchApiKeys = async () => {
+  if (!adminToken.value) return
+  try {
+    const res = await fetch('/admin/keys', {
+      headers: {
+        'Authorization': `Bearer ${adminToken.value}`
+      }
+    })
+    if (res.ok) {
+      apiKeys.value = await res.json()
+    }
+  } catch (err) {
+    console.error('Failed to fetch keys:', err)
+  }
+}
+
+const generateNewKey = async () => {
+  if (!adminToken.value) return
+  try {
+    const res = await fetch('/admin/keys', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken.value}`
+      },
+      body: JSON.stringify({ label: newKeyLabel.value || 'Dashboard Key' })
+    })
+    if (res.ok) {
+      const data = await res.json()
+      alert(`Key generated successfully:\n\n${data.key}\n\nMake sure to copy it now. It will not be shown again!`)
+      newKeyLabel.value = ''
+      await fetchApiKeys()
+    } else {
+      const txt = await res.text()
+      alert(`Failed to generate key: ${txt}`)
+    }
+  } catch (err: any) {
+    alert(`Failed to generate key: ${err.message}`)
+  }
+}
+
+const deleteApiKey = async (id: string) => {
+  if (!adminToken.value) return
+  if (!confirm('Are you sure you want to revoke this client API key?')) return
+  try {
+    const res = await fetch(`/admin/keys/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${adminToken.value}`
+      }
+    })
+    if (res.ok) {
+      await fetchApiKeys()
+    }
+  } catch (err) {
+    console.error('Failed to delete key:', err)
+  }
+}
+
+const deployGateway = async () => {
   isDeploying.value = true
-  setTimeout(() => {
-    isDeploying.value = false
+  syncError.value = ''
+  try {
+    const res = await fetch('/admin/config', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken.value}`
+      },
+      body: JSON.stringify({
+        upstream: guardsConfig.value.gatewaySettings.upstream,
+        upstream_key: guardsConfig.value.gatewaySettings.upstreamKey || undefined,
+        max_body_bytes: Number(guardsConfig.value.gatewaySettings.maxBodyBytes),
+        outbound_mode: guardsConfig.value.gatewaySettings.outboundMode
+      })
+    })
+    if (!res.ok) {
+      const errMsg = await res.text()
+      throw new Error(errMsg || `HTTP error ${res.status}`)
+    }
     justDeployed.value = true
     
     // Toggle active project status to shielding
@@ -477,11 +588,28 @@ const deployGateway = () => {
     setTimeout(() => {
       justDeployed.value = false
     }, 3000)
-  }, 1500)
+    await fetchBackendConfig() // Refresh settings from server
+  } catch (err: any) {
+    console.error('Deployment failed:', err)
+    syncError.value = `Deployment failed: ${err.message}`
+  } finally {
+    isDeploying.value = false
+  }
 }
 
+onMounted(() => {
+  fetchBackendConfig()
+  fetchApiKeys()
+})
+
+watch(adminToken, (newVal) => {
+  localStorage.setItem('cerberus_admin_token', newVal)
+  fetchBackendConfig()
+  fetchApiKeys()
+})
+
 // Proxy Endpoint Links
-const proxyEndpoint = computed(() => `https://api.cerberus.sh/v1/proxy/${shieldId.value}`)
+const proxyEndpoint = computed(() => window.location.origin)
 
 // Snippets code
 const codeSnippets = computed(() => {
@@ -491,7 +619,7 @@ const response = await fetch("${proxyEndpoint.value}/v1/chat/completions", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "Authorization": "Bearer YOUR_API_KEY",
+    "Authorization": "Bearer YOUR_CLIENT_KEY",
   },
   body: JSON.stringify({
     model: "gpt-4o",
@@ -506,7 +634,7 @@ import openai
 
 client = openai.OpenAI(
     base_url="${proxyEndpoint.value}/v1",
-    api_key="YOUR_API_KEY"
+    api_key="YOUR_CLIENT_KEY"
 )
 
 completion = client.chat.completions.create(
@@ -516,7 +644,7 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)`,
     curl: `curl ${proxyEndpoint.value}/v1/chat/completions \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer $OPENAI_API_KEY" \\
+  -H "Authorization: Bearer YOUR_CLIENT_KEY" \\
   -d '{
     "model": "gpt-4o",
     "messages": [{"role": "user", "content": "Test prompt injection vector..."}]
@@ -663,7 +791,7 @@ const copySnippet = () => {
       </div>
 
       <!-- Layout Panel Grid -->
-      <div class="flex-1 grid lg:grid-cols-12 min-h-0">
+      <div class="grid lg:grid-cols-12">
         
         <!-- Left Column: Available Shelf (Node Library Shelf) -->
         <div class="lg:col-span-3 p-6 border-r border-zinc-900 flex flex-col space-y-4 text-left">
@@ -710,10 +838,58 @@ const copySnippet = () => {
               </div>
             </div>
           </div>
+          <!-- Go Gateway Client API Keys Manager -->
+          <div class="border-t border-zinc-900 pt-4 flex flex-col space-y-3 shrink-0">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-450 mb-1">Gateway Client Keys</h3>
+              <p class="text-[9px] text-zinc-550 leading-relaxed">Generated tokens authorized to proxy prompts through Cerberus.</p>
+            </div>
+
+            <!-- Create new key form -->
+            <div class="flex gap-2">
+              <input 
+                type="text" 
+                v-model="newKeyLabel" 
+                placeholder="Key label..."
+                @keyup.enter="generateNewKey"
+                class="flex-1 text-[9px] bg-zinc-950 border border-zinc-900 text-zinc-300 p-1.5 rounded focus:outline-none font-mono"
+              />
+              <button 
+                @click="generateNewKey"
+                class="text-[9px] font-bold text-zinc-950 bg-zinc-100 hover:bg-white px-2.5 py-1.5 rounded cursor-pointer transition-all"
+              >
+                Create
+              </button>
+            </div>
+
+            <!-- Key List scrollbox -->
+            <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+              <div 
+                v-for="key in apiKeys" 
+                :key="key.id"
+                class="flex items-center justify-between p-2 rounded bg-zinc-950/40 border border-zinc-900 text-[9px] font-mono"
+              >
+                <div class="text-left truncate pr-2">
+                  <span class="text-zinc-300 block font-sans font-bold leading-normal truncate">{{ key.label }}</span>
+                  <span class="text-zinc-600 block text-[8px] mt-0.5 font-mono">ID: {{ key.id }}</span>
+                </div>
+                <button 
+                  @click="deleteApiKey(key.id)"
+                  class="text-zinc-600 hover:text-red-400 p-1 rounded hover:bg-zinc-900/60 transition-colors cursor-pointer shrink-0"
+                  title="Revoke Key"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div v-if="apiKeys.length === 0" class="text-center text-[9px] text-zinc-600 font-mono py-2">
+                No active keys.
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Right Side: Infinite Sandbox Canvas and Parameter Panel -->
-        <div class="lg:col-span-9 flex flex-col min-h-0">
+        <div class="lg:col-span-9 flex flex-col">
           
           <!-- Infinite Sandbox Canvas (400px Height) -->
           <div class="p-6 border-b border-zinc-900 shrink-0">
@@ -745,10 +921,10 @@ const copySnippet = () => {
               <div 
                 v-for="node in Object.values(nodes).filter(n => n.active)" 
                 :key="node.key"
-                @mousedown="selectedGuardKey = node.key as GuardKey"
+                @mousedown="selectedGuardKey = (node.type === 'guard' ? node.key : 'gatewaySettings') as GuardKey"
                 class="absolute w-52 h-[76px] rounded bg-zinc-900 border border-zinc-800 flex flex-col justify-between text-left p-2.5 shadow-lg select-none"
                 :class="[
-                  selectedGuardKey === node.key ? 'border-zinc-500 bg-zinc-900/90' : 'border-zinc-850 bg-zinc-900/60',
+                  ((node.type === 'guard' && selectedGuardKey === node.key) || (node.type !== 'guard' && selectedGuardKey === 'gatewaySettings')) ? 'border-zinc-500 bg-zinc-900/90' : 'border-zinc-850 bg-zinc-900/60',
                   node.type === 'guard' ? 'hover:border-zinc-600' : 'bg-zinc-950/80 border-dashed border-zinc-800'
                 ]"
                 :style="{ left: node.x + 'px', top: node.y + 'px' }"
@@ -791,7 +967,7 @@ const copySnippet = () => {
           </div>
 
           <!-- Bottom Panel: Config details and compiled JSON -->
-          <div class="flex-1 grid md:grid-cols-12 p-6 gap-6 min-h-0 bg-zinc-900/10 border-t border-zinc-900 overflow-y-auto">
+          <div class="grid md:grid-cols-12 p-6 gap-6 bg-zinc-900/10 border-t border-zinc-900">
             
             <!-- Parameters configuration detail -->
             <div class="md:col-span-5 flex flex-col justify-start space-y-4">
@@ -804,7 +980,7 @@ const copySnippet = () => {
               <div class="cyber-card rounded p-4 border border-zinc-850 bg-zinc-900/10 text-left space-y-4">
                 
                 <!-- Active/Enable switch control -->
-                <div class="flex items-center justify-between pb-3 border-b border-zinc-850/50">
+                <div v-if="selectedGuardKey !== 'gatewaySettings'" class="flex items-center justify-between pb-3 border-b border-zinc-850/50">
                   <span class="text-[10px] font-bold text-zinc-300 font-push">Active Pipeline State</span>
                   <button 
                     @click="nodes[selectedGuardKey].active = !nodes[selectedGuardKey].active; syncProjectGuardsCount()"
@@ -971,6 +1147,65 @@ const copySnippet = () => {
                       <span class="text-xs text-zinc-600 pl-1">$</span>
                       <input type="number" step="0.5" v-model.number="guardsConfig.rateLimiter.costCeilingPerDay" class="w-full text-[10px] bg-transparent border-none text-zinc-150 p-1 focus:outline-none" />
                     </div>
+                  </div>
+                </div>
+
+                <!-- E. Gateway Core Settings (Go Backend Config) -->
+                <div v-else-if="selectedGuardKey === 'gatewaySettings'" class="space-y-4">
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Admin Secret Token</label>
+                    <input 
+                      type="password" 
+                      v-model="adminToken" 
+                      placeholder="Enter CERBERUS_ADMIN_TOKEN..."
+                      class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                    />
+                  </div>
+
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Destination URL</label>
+                    <input 
+                      type="text" 
+                      v-model="guardsConfig.gatewaySettings.upstream" 
+                      placeholder="e.g. https://openrouter.ai/api/v1"
+                      class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                    />
+                  </div>
+
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-semibold text-zinc-350 font-push">Upstream Authorization Key</label>
+                    <input 
+                      type="password" 
+                      v-model="guardsConfig.gatewaySettings.upstreamKey" 
+                      placeholder="Keep empty to forward client token unchanged"
+                      class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                      <label class="text-[10px] font-semibold text-zinc-350 font-push">Max Payload (Bytes)</label>
+                      <input 
+                        type="number" 
+                        v-model.number="guardsConfig.gatewaySettings.maxBodyBytes" 
+                        class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-mono" 
+                      />
+                    </div>
+                    <div class="space-y-1">
+                      <label class="text-[10px] font-semibold text-zinc-350 font-push">Outbound Mode</label>
+                      <select 
+                        v-model="guardsConfig.gatewaySettings.outboundMode"
+                        class="w-full text-[10px] bg-zinc-950 border border-zinc-900 text-zinc-150 p-2 rounded focus:ring-1 focus:ring-zinc-700 focus:outline-none font-push"
+                      >
+                        <option value="off">Off (Passthrough)</option>
+                        <option value="buffer">Buffer (Scan Full)</option>
+                        <option value="stream">Stream (Scan SSE)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div v-if="syncError" class="text-[9.5px] text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2 rounded">
+                    {{ syncError }}
                   </div>
                 </div>
 

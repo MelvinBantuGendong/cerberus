@@ -31,8 +31,6 @@ router.beforeEach((to, _from, next) => {
   const isAuthenticated = localStorage.getItem('cerberus_auth') === 'true'
   if (to.name !== 'login' && !isAuthenticated) {
     next({ name: 'login' })
-  } else if (to.name === 'login' && isAuthenticated) {
-    next({ name: 'builder' })
   } else {
     next()
   }
