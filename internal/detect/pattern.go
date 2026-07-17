@@ -20,6 +20,8 @@ type patternDetector struct {
 	rules     []rule
 }
 
+func (d patternDetector) ID() string { return d.category }
+
 func (d patternDetector) Check(s ingest.Segment) verdict.Verdict {
 	var score float64
 	var matched []string

@@ -9,7 +9,14 @@ import (
 	"github.com/MelvinBantuGendong/cerberus/internal/store"
 )
 
-func adminHandler(token string, st *store.Store) http.Handler {
+type DetectorInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Direction   string `json:"direction"`
+}
+
+func adminHandler(token string, st *store.Store, catalog []DetectorInfo) http.Handler {
 	m := http.NewServeMux()
 
 	m.HandleFunc("GET /admin/config", func(w http.ResponseWriter, r *http.Request) {
@@ -18,16 +25,22 @@ func adminHandler(token string, st *store.Store) http.Handler {
 
 	m.HandleFunc("PUT /admin/config", func(w http.ResponseWriter, r *http.Request) {
 		var p struct {
-			Upstream     *string `json:"upstream"`
-			UpstreamKey  *string `json:"upstream_key"`
-			MaxBodyBytes *int64  `json:"max_body_bytes"`
-			OutboundMode *string `json:"outbound_mode"`
+			Upstream      *string   `json:"upstream"`
+			UpstreamKey   *string   `json:"upstream_key"`
+			MaxBodyBytes  *int64    `json:"max_body_bytes"`
+			OutboundMode  *string   `json:"outbound_mode"`
+			DisabledRules *[]string `json:"disabled_rules"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 			http.Error(w, "invalid JSON body", http.StatusBadRequest)
 			return
 		}
-		patch := store.SettingsPatch{Upstream: p.Upstream, UpstreamKey: p.UpstreamKey, MaxBodyBytes: p.MaxBodyBytes}
+		patch := store.SettingsPatch{
+			Upstream:      p.Upstream,
+			UpstreamKey:   p.UpstreamKey,
+			MaxBodyBytes:  p.MaxBodyBytes,
+			DisabledRules: p.DisabledRules,
+		}
 		if p.OutboundMode != nil {
 			mode := config.OutboundMode(*p.OutboundMode)
 			patch.OutboundMode = &mode
@@ -37,6 +50,13 @@ func adminHandler(token string, st *store.Store) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, st.View())
+	})
+
+	m.HandleFunc("GET /admin/detectors", func(w http.ResponseWriter, r *http.Request) {
+		if catalog == nil {
+			catalog = []DetectorInfo{}
+		}
+		writeJSON(w, http.StatusOK, catalog)
 	})
 
 	m.HandleFunc("GET /admin/keys", func(w http.ResponseWriter, r *http.Request) {

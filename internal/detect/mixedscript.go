@@ -9,6 +9,8 @@ import (
 
 type mixedScript struct{}
 
+func (mixedScript) ID() string { return "obfuscation" }
+
 func (mixedScript) Check(s ingest.Segment) verdict.Verdict {
 	if !hasMixedScriptToken(s.Text) {
 		return verdict.Allowing(verdict.Inbound, s.Trust)

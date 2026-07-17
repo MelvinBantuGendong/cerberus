@@ -20,7 +20,7 @@ func adminGateway(t *testing.T) (*httptest.Server, func()) {
 	}))
 	u, _ := url.Parse(up.URL)
 	cfg := config.Config{UpstreamBase: u, IncomingPrefix: "/v1", AdminToken: adminTok}
-	gw, err := New(cfg, mustStore(t, cfg), nil, nil)
+	gw, err := New(cfg, mustStore(t, cfg), nil, nil, nil)
 	if err != nil {
 		up.Close()
 		t.Fatalf("New: %v", err)

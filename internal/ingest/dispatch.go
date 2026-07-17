@@ -10,6 +10,22 @@ type Detector interface {
 	Check(Segment) verdict.Verdict
 }
 
+type identified interface{ ID() string }
+
+func Enabled(dets []Detector, disabled map[string]bool) []Detector {
+	if len(disabled) == 0 {
+		return dets
+	}
+	out := make([]Detector, 0, len(dets))
+	for _, d := range dets {
+		if id, ok := d.(identified); ok && disabled[id.ID()] {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
 func Dispatch(dir verdict.Direction, segs []Segment, dets []Detector) verdict.Verdict {
 	out := verdict.Verdict{
 		Action:       verdict.Allow,
