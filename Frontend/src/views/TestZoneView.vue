@@ -370,7 +370,7 @@ onMounted(loadCatalog)
               <p class="text-[10px] text-zinc-550 leading-relaxed">Forwarded verbatim to the upstream. OpenRouter uses namespaced slugs (<code class="text-zinc-400">openai/gpt-4o</code>, <code class="text-zinc-400">anthropic/claude-3.5-sonnet</code>).</p>
             </div>
             <div class="space-y-1.5">
-              <label class="text-xs font-semibold text-zinc-350 font-push uppercase tracking-wider">Client Key (optional)</label>
+              <label class="text-xs font-semibold text-zinc-350 font-push uppercase tracking-wider">Client Key</label>
               <input
                 type="password"
                 v-model="clientKey"

@@ -24,6 +24,20 @@ const justDeployed = ref(false)
 const copied = ref(false)
 const activeTab = ref<'js' | 'python' | 'curl'>('js')
 
+const showKeyModal = ref(false)
+const generatedKey = ref('')
+const generatedKeyLabel = ref('')
+const copiedGeneratedKey = ref(false)
+const keyGenError = ref('')
+
+const copyGeneratedKey = () => {
+  navigator.clipboard.writeText(generatedKey.value)
+  copiedGeneratedKey.value = true
+  setTimeout(() => {
+    copiedGeneratedKey.value = false
+  }, 2000)
+}
+
 interface Project {
   id: string
   name: string
@@ -162,6 +176,7 @@ const fetchApiKeys = async () => {
 
 const generateNewKey = async () => {
   if (!adminToken.value) return
+  keyGenError.value = ''
   try {
     const res = await fetch('/admin/keys', {
       method: 'POST',
@@ -175,15 +190,19 @@ const generateNewKey = async () => {
       const data = await res.json()
 
       localStorage.setItem('cerberus_last_client_key', data.key)
-      alert(`Key generated successfully:\n\n${data.key}\n\nMake sure to copy it now. It will not be shown again!`)
+      
+      generatedKey.value = data.key
+      generatedKeyLabel.value = data.label || 'Dashboard Key'
+      showKeyModal.value = true
+
       newKeyLabel.value = ''
       await fetchApiKeys()
     } else {
       const txt = await res.text()
-      alert(`Failed to generate key: ${txt}`)
+      keyGenError.value = `Failed: ${txt}`
     }
   } catch (err: any) {
-    alert(`Failed to generate key: ${err.message}`)
+    keyGenError.value = `Error: ${err.message}`
   }
 }
 
@@ -426,6 +445,10 @@ const copySnippet = () => {
               </button>
             </div>
 
+            <div v-if="keyGenError" class="text-[10px] text-red-400 font-mono leading-relaxed bg-red-950/20 border border-red-900/30 p-2.5 rounded">
+              {{ keyGenError }}
+            </div>
+
             <!-- Key List scrollbox -->
             <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               <div
@@ -633,5 +656,53 @@ const copySnippet = () => {
       </div>
 
     </main>
+
+    <!-- API Key Generated Modal Overlay -->
+    <div 
+      v-if="showKeyModal" 
+      class="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <div 
+        class="cyber-card rounded p-6 border border-zinc-800 bg-zinc-900 max-w-md w-full space-y-5 text-left shadow-2xl relative"
+      >
+        <div class="space-y-1">
+          <h3 class="text-sm font-bold text-white font-push uppercase tracking-wider">API Key Generated</h3>
+          <p class="text-xs text-zinc-500">Copy this secret key. For security, you won't be able to view it again.</p>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-semibold text-zinc-400 font-push uppercase tracking-wider">Key Label</label>
+          <div class="text-xs text-zinc-350 font-mono bg-zinc-950 border border-zinc-950 p-2.5 rounded">
+            {{ generatedKeyLabel }}
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-semibold text-zinc-400 font-push uppercase tracking-wider">Secret API Key</label>
+          <div class="flex items-center justify-between bg-zinc-950 border border-zinc-950 rounded p-2.5 text-xs font-mono text-zinc-300">
+            <span class="truncate pr-4 select-all">{{ generatedKey }}</span>
+            <button 
+              @click="copyGeneratedKey"
+              class="text-zinc-500 hover:text-white p-1 rounded hover:bg-zinc-900 transition-all shrink-0 cursor-pointer"
+              title="Copy Key"
+            >
+              <Check v-if="copiedGeneratedKey" class="w-3.5 h-3.5 text-emerald-400" />
+              <Copy v-else class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-amber-950/10 border border-amber-900/30 rounded p-3 text-[10px] text-amber-500 font-mono leading-relaxed">
+          WARNING: Store it safely! Anyone who has this key can access your reverse proxy backend admin endpoints.
+        </div>
+
+        <button 
+          @click="showKeyModal = false"
+          class="w-full bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-xs py-2.5 rounded transition-all duration-150 cursor-pointer font-push text-center"
+        >
+          I have saved this key
+        </button>
+      </div>
+    </div>
   </div>
 </template>
